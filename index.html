@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wingfoil Windows – Québec Area</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Arial;margin:24px;max-width:1100px}
+  table{border-collapse:collapse;width:100%}
+  th,td{border:1px solid #ddd;padding:6px;text-align:center;font-size:14px}
+  th{position:sticky;top:0;background:#f8f8f8}
+  .ok{background:#c9f7c0} .no{background:#ffd1d1}
+  .mono{font-variant-numeric:tabular-nums}
+  .small{font-size:12px;color:#666}
+  .pill{display:inline-block;padding:2px 6px;border-radius:999px;border:1px solid #999;margin-left:6px;font-size:12px}
+</style>
+<h1>Wingfoil Windows – Québec Area <span class="pill">Local time</span></h1>
+<p class="small">Models via Open-Meteo (winds & tides). Times are local (America/Toronto).<br>
+Rules: Baie de Beauport ≥10 kn; Sainte-Anne-de-Beaupré SW & rising & ≥12 kn; St-Jean (Île d’Orléans) NE & falling & ≥12 kn.</p>
+<table id="grid"><thead></thead><tbody></tbody></table>
+<script>
+(async function(){
+  let data;
+  try{
+    data = await fetch('forecast.json',{cache:'no-store'}).then(r=>r.json());
+  }catch(e){
+    document.body.insertAdjacentHTML('beforeend','<p style="color:#b00">Could not load forecast.json. If you just set this up, run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');
+    return;
+  }
+  const head = document.querySelector('#grid thead');
+  const body = document.querySelector('#grid tbody');
+
+  head.innerHTML = `
+    <tr>
+      <th>Time</th>
+      <th>Baie de Beauport<br><small>≥10 kn</small></th>
+      <th>Ste-Anne-de-Beaupré<br><small>SW 200–250° & Rising & ≥12 kn</small></th>
+      <th>St-Jean, Île d’Orléans<br><small>NE 30–70° & Falling & ≥12 kn</small></th>
+    </tr>`;
+
+  for (const row of data.hours) {
+    const t = new Date(row.time).toLocaleString('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', day: '2-digit', month: '2-digit' });
+    const b = row.beauport  || {};
+    const s = row.ste_anne  || {};
+    const j = row.st_jean   || {};
+
+    function cell(obj, key){
+      const go = obj.go && obj.go[key];
+      const wind = (obj.wind_kn ?? '-') + ' kn';
+      const dir  = (obj.dir_deg ?? '-') + '°';
+      const tide = (obj.tide ?? '-');
+      return `<td class="${go ? 'ok':'no'}">${wind}<br>${dir}<br><span class="small">${tide}</span></td>`;
+    }
+
+    body.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td class="mono">${t}</td>
+        ${cell(b,'beauport')}
+        ${cell(s,'ste_anne')}
+        ${cell(j,'st_jean')}
+      </tr>`);
+  }
+})();
+</script>
+</html>

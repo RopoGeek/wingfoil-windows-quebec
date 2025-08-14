@@ -36,7 +36,7 @@
   th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:12px}
   th.day{min-width:80px;text-align:center}
   th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:44px}
-  td{height:18px;width:56px;padding:0}
+  td{height:18px;width:56px;padding:0}  /* narrow columns */
   .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
@@ -50,7 +50,8 @@
 </header>
 <p class="muted">
   Flip between spots below. Use the toggle to show <b>Daylight (06–21)</b> or <b>All hours (00–23)</b>.
-  Days are columns, hours are rows. Hover a cell to see wind (kn), cardinal & tide.
+  Days are columns, hours are rows. Coloring is based on <b>gust speed</b> meeting your rules.
+  Hover a cell to see <b>gust</b>, <b>avg</b>, cardinal & tide.
 </p>
 
 <div class="controls">
@@ -62,7 +63,7 @@
 </div>
 
 <div class="legend">
-  <span class="swatch s-ok"></span> Go &nbsp;
+  <span class="swatch s-ok"></span> Go (gust meets rule) &nbsp;
   <span class="swatch s-no"></span> Not meeting rules &nbsp;
   <span class="swatch s-unk"></span> Missing data
 </div>
@@ -71,10 +72,10 @@
 
 <p class="footnote">
   Rules:
-  <b>Baie de Beauport</b> ≥10 kn (any direction);
-  <b>Ste-Anne-de-Beaupré</b> SW 200–250° & rising tide & ≥12 kn;
-  <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥12 kn.
-  Arrows point <b>from</b> the wind’s source (meteorological direction).
+  <b>Baie de Beauport</b> ≥10 kn gust (any direction);
+  <b>Ste-Anne-de-Beaupré</b> SW 200–250° & rising tide & ≥12 kn gust;
+  <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥12 kn gust.
+  Arrow points <b>from</b> the wind’s source (based on mean wind direction).
 </p>
 
 <script>
@@ -114,9 +115,10 @@
     const ix = Math.round(((deg%360)/45)) % 8;
     return dirs[ix];
   }
+  // Arrow shows "from" direction; rotate an up arrow by (180 + deg).
   function arrowSVG(deg){
     if (deg==null || isNaN(deg)) return '';
-    const rot = (180 + Number(deg)) % 360; // "from" direction
+    const rot = (180 + Number(deg)) % 360;
     return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg)">
       <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
     </svg>`;
@@ -214,10 +216,11 @@
         }
 
         const tide = (obj.tide ?? 'unknown');
-        const w = (obj.wind_kn == null ? '-' : obj.wind_kn + ' kn');
-        const deg = obj.dir_deg;
+        const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);           // gusts in kn
+        const avg  = (obj.wind_avg_kn == null ? '' : `, avg ${obj.wind_avg_kn} kn`);
+        const deg  = obj.dir_deg;
         const card = degToCardinal(deg);
-        const tip = `${dk} ${hrStr}:00 — ${w}${card?` (${card} ${deg??''}°)`:''} • tide: ${tide}`;
+        const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tide}`;
 
         const td = document.createElement('td');
         td.innerHTML = `<div class="cell" title="${tip}">${deg!=null ? arrowSVG(deg) : ''}</div>`;

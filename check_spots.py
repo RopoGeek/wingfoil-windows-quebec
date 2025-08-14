@@ -1,18 +1,14 @@
 # check_spots.py
-# Fetches hourly wind (kn, dir) + tide height (m) from Open-Meteo for 72h,
-# applies your rules, and writes forecast.json consumed by index.html.
-#
-# How to run locally (optional):
-#   python3 check_spots.py
-#
-# No extra Python packages needed.
+# Uses Open-Meteo for hourly wind gusts, mean wind & direction, and tide height.
+# "Go" is evaluated on GUST speed (kn) now, not average.
+# Output keeps avg & dir for your arrow/tooltip.
 
 import json, math, datetime as dt, urllib.request, urllib.parse, sys
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
-HOURS = 96  # look ahead
+HOURS = 96  # look ahead (change if you prefer)
 
 SPOTS = {
     "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},
@@ -32,7 +28,8 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
         "latitude": lat, "longitude": lon,
-        "hourly": "windspeed_10m,winddirection_10m",
+        # NOTE: we now ask for gusts as well
+        "hourly": "windspeed_10m,windgusts_10m,winddirection_10m",
         "wind_speed_unit": "kn",
         "timezone": "America/Toronto",
         "start_date": start_dt.date().isoformat(),
@@ -54,8 +51,6 @@ def fetch_open_meteo_tide(lat, lon, start_dt, end_dt):
         return json.load(r)
 
 def tide_trend(series, idx):
-    # Determine rising/falling around hour idx using surrounding values
-    # Return "rising", "falling", "slack", or "unknown"
     try:
         prev_h = float(series[idx-1]) if idx-1 >= 0 and series[idx-1] is not None else None
         cur_h  = float(series[idx])   if series[idx] is not None else None
@@ -83,15 +78,16 @@ def main():
 
     spot_data = {}
     for key, spot in SPOTS.items():
-        # Wind
+        # Wind (gusts + mean + direction)
         try:
             wjson = fetch_open_meteo_wind(spot["lat"], spot["lon"], start, end)
             hours = wjson["hourly"]["time"]
-            winds = wjson["hourly"]["windspeed_10m"]
-            dirs  = wjson["hourly"]["winddirection_10m"]
+            wind_avg = wjson["hourly"]["windspeed_10m"]       # knots
+            wind_gust = wjson["hourly"]["windgusts_10m"]      # knots
+            dirs  = wjson["hourly"]["winddirection_10m"]      # degrees
         except Exception as e:
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
-            hours, winds, dirs = [], [], []
+            hours, wind_avg, wind_gust, dirs = [], [], [], []
 
         # Tide
         tide_times, tide_vals = [], []
@@ -102,40 +98,46 @@ def main():
         except Exception as e:
             print(f"[WARN] Tide fetch failed for {spot['name']}: {e}", file=sys.stderr)
 
-        spot_data[key] = {"hours": hours, "winds": winds, "dirs": dirs,
-                          "tide_times": tide_times, "tide_vals": tide_vals}
+        spot_data[key] = {
+            "hours": hours, "avg": wind_avg, "gust": wind_gust, "dirs": dirs,
+            "tide_times": tide_times, "tide_vals": tide_vals
+        }
 
-    # Use Beauport's wind timeline as the backbone
+    # Use Beauport timeline as backbone
     timeline = spot_data["beauport"]["hours"] or []
-    for i, t in enumerate(timeline):
+    for t in timeline:
         row = {"time": t}
         for key in SPOTS.keys():
-            w = d = None
+            gust = avg = d = None
             tide_status = "unknown"
-            # align wind by timestamp
+            # align wind arrays at timestamp t
             try:
                 idx = spot_data[key]["hours"].index(t)
-                w = float(spot_data[key]["winds"][idx])
-                d = float(spot_data[key]["dirs"][idx])
+                gust = float(spot_data[key]["gust"][idx]) if spot_data[key]["gust"][idx] is not None else None
+                avg  = float(spot_data[key]["avg"][idx])  if spot_data[key]["avg"][idx]  is not None else None
+                d    = float(spot_data[key]["dirs"][idx]) if spot_data[key]["dirs"][idx] is not None else None
             except Exception:
                 pass
-            # align tide by timestamp
+            # tide
             try:
                 tidx = spot_data[key]["tide_times"].index(t)
                 tide_status = tide_trend(spot_data[key]["tide_vals"], tidx)
             except Exception:
                 pass
 
+            # Evaluate rules on GUST speed:
             go_flag = False
             if key == "beauport":
-                go_flag = (w is not None and w >= 10.0)
+                go_flag = (gust is not None and gust >= 10.0)
             elif key == "ste_anne":
-                go_flag = (w is not None and w >= 12.0 and d is not None and in_SW(d) and tide_status == "rising")
+                go_flag = (gust is not None and gust >= 12.0 and d is not None and in_SW(d) and tide_status == "rising")
             elif key == "st_jean":
-                go_flag = (w is not None and w >= 12.0 and d is not None and in_NE(d) and tide_status == "falling")
+                go_flag = (gust is not None and gust >= 12.0 and d is not None and in_NE(d) and tide_status == "falling")
 
+            # IMPORTANT: We keep "wind_kn" = gust for the UI coloring, and add "wind_avg_kn" for tooltip
             row[key] = {
-                "wind_kn": round(w, 1) if w is not None else None,
+                "wind_kn": round(gust, 1) if gust is not None else None,         # gusts
+                "wind_avg_kn": round(avg, 1) if avg is not None else None,       # mean
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {

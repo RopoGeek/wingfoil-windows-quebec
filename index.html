@@ -17,9 +17,14 @@
   h1{font-size:20px;margin:0}
   .pill{border:1px solid #aaa;border-radius:999px;padding:2px 8px;font-size:12px;color:#444}
   .muted{color:var(--muted);font-size:13px}
-  .tabs{display:flex;gap:8px;margin:14px 0}
-  .tab{padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer}
+
+  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .tabs{display:flex;gap:8px;margin:10px 0}
+  .tab,.toggle{
+    padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer;background:#fff
+  }
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
+  .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
   .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px}
   .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
   .s-ok{background:var(--ok)} .s-no{background:var(--no)} .s-unk{background:var(--neutral)}
@@ -31,11 +36,11 @@
   th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:12px}
   th.day{min-width:80px;text-align:center}
   th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:44px}
-  td{height:18px;width:56px;padding:0}           /* ~less than half the previous width (120px) */
+  td{height:18px;width:56px;padding:0}
   .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
-  /* Tiny arrow svg */
+  /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
 </style>
 
@@ -44,11 +49,17 @@
   <span class="pill">Local time (America/Toronto)</span>
 </header>
 <p class="muted">
-  Flip between spots below. Each grid shows <b>hours vertically (06–21)</b> and <b>days horizontally</b>.
-  Cells turn green only when your rules are met. Hover a cell to see wind (kn), cardinal & tide.
+  Flip between spots below. Use the toggle to show <b>Daylight (06–21)</b> or <b>All hours (00–23)</b>.
+  Days are columns, hours are rows. Hover a cell to see wind (kn), cardinal & tide.
 </p>
 
-<div class="tabs" id="tabs"></div>
+<div class="controls">
+  <div class="tabs" id="tabs"></div>
+  <div class="viewtoggles">
+    <button class="toggle active" id="tgl-daylight">Daylight</button>
+    <button class="toggle" id="tgl-all">All hours</button>
+  </div>
+</div>
 
 <div class="legend">
   <span class="swatch s-ok"></span> Go &nbsp;
@@ -68,9 +79,12 @@
 
 <script>
 (async function(){
-  // Config: show daylight hours only
-  const HOUR_START = 6;   // inclusive
-  const HOUR_END   = 21;  // inclusive
+  // Default view mode
+  let VIEW = 'daylight'; // 'daylight' | 'all'
+  const HOUR_RANGE = {
+    daylight:[6,21],
+    all:[0,23],
+  };
 
   // Load data
   let data;
@@ -81,7 +95,6 @@
       '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');
     return;
   }
-
   const hours = data.hours || [];
   if (!hours.length){
     document.body.insertAdjacentHTML('beforeend',
@@ -101,18 +114,15 @@
     const ix = Math.round(((deg%360)/45)) % 8;
     return dirs[ix];
   }
-  // Build a tiny SVG arrow pointing UP by default; rotate to show "from" direction.
   function arrowSVG(deg){
     if (deg==null || isNaN(deg)) return '';
-    // For "from" direction: rotate an up arrow by (180 + deg)
-    const rot = (180 + Number(deg)) % 360;
-    return `
-      <svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg)">
-        <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
-      </svg>`;
+    const rot = (180 + Number(deg)) % 360; // "from" direction
+    return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg)">
+      <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
+    </svg>`;
   }
 
-  // Group by local day key
+  // Group by day
   const byDay = new Map();
   for(const row of hours){
     const t = toLocal(row.time);
@@ -123,6 +133,7 @@
   for(const arr of byDay.values()){
     arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
   }
+  const dayOrder = Array.from(byDay.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
   const spots = [
     {key:'beauport', label:'Baie de Beauport'},
@@ -133,6 +144,7 @@
   const tabBar = document.getElementById('tabs');
   const matrices = document.getElementById('matrices');
 
+  // Build tabs
   spots.forEach((s,i)=>{
     const tab = document.createElement('button');
     tab.className = 'tab' + (i===0?' active':'');
@@ -141,12 +153,14 @@
     tabBar.appendChild(tab);
   });
 
-  function buildMatrix(spotKey){
+  function buildMatrix(spotKey, mode){
+    const [HSTART, HEND] = HOUR_RANGE[mode];
+
     const container = document.createElement('div');
     container.className = 'matrix-wrap';
     const tbl = document.createElement('table');
 
-    // Header row
+    // Header
     const thead = document.createElement('thead');
     const htr = document.createElement('tr');
 
@@ -155,7 +169,6 @@
     corner.textContent = 'Hour';
     htr.appendChild(corner);
 
-    const dayOrder = Array.from(byDay.keys()).sort((a,b)=> new Date(a)-new Date(b));
     dayOrder.forEach(dk=>{
       const th = document.createElement('th');
       th.className = 'day';
@@ -166,7 +179,7 @@
     thead.appendChild(htr);
     tbl.appendChild(thead);
 
-    // Build a quick access map[day][hour] = row[spotKey]
+    // Build map[day][hour] = row[spotKey]
     const map = {};
     dayOrder.forEach(k=>{
       map[k] = {};
@@ -178,8 +191,7 @@
     });
 
     const tbody = document.createElement('tbody');
-    // Only daylight hours
-    for(let hour=HOUR_START; hour<=HOUR_END; hour++){
+    for(let hour=HSTART; hour<=HEND; hour++){
       const hrStr = hour.toString().padStart(2,'0');
       const tr = document.createElement('tr');
 
@@ -221,26 +233,42 @@
     return container;
   }
 
-  // Render views
-  const views = {};
-  spots.forEach((s,i)=>{
-    const v = buildMatrix(s.key);
-    v.style.display = i===0 ? 'block':'none';
-    v.id = 'view-'+s.key;
-    matrices.appendChild(v);
-    views[s.key] = v;
-  });
+  function render(mode){
+    matrices.innerHTML = '';
+    const views = {};
+    spots.forEach((s,i)=>{
+      const v = buildMatrix(s.key, mode);
+      v.style.display = i===0 ? 'block':'none';
+      v.id = 'view-'+s.key;
+      matrices.appendChild(v);
+      views[s.key] = v;
+    });
 
-  // Tab switching
-  tabBar.addEventListener('click', (e)=>{
-    const btn = e.target.closest('.tab');
-    if(!btn) return;
-    [...tabBar.children].forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const target = btn.dataset.target;
-    Object.values(views).forEach(v=>v.style.display='none');
-    views[target].style.display = 'block';
-  });
+    // Tab switching
+    tabBar.onclick = (e)=>{
+      const btn = e.target.closest('.tab');
+      if(!btn) return;
+      [...tabBar.children].forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.target;
+      Object.values(views).forEach(v=>v.style.display='none');
+      views[target].style.display = 'block';
+    };
+  }
+
+  // Initial render
+  render(VIEW);
+
+  // Toggle listeners
+  const btnDay = document.getElementById('tgl-daylight');
+  const btnAll = document.getElementById('tgl-all');
+  function setToggle(active){
+    btnDay.classList.toggle('active', active==='daylight');
+    btnAll.classList.toggle('active', active==='all');
+  }
+  btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
+  btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
+
 })();
 </script>
 </html>

@@ -90,7 +90,7 @@
   // Load data
   let data;
   try{
-    data = await fetch('forecast.json',{cache:'no-store'}).then(r=>r.json());
+    data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
   }catch(e){
     document.body.insertAdjacentHTML('beforeend',
       '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');

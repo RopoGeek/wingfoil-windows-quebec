@@ -4,61 +4,230 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Wingfoil Windows – Québec Area</title>
 <style>
-  body{font-family:system-ui,Segoe UI,Arial;margin:24px;max-width:1100px}
-  table{border-collapse:collapse;width:100%}
-  th,td{border:1px solid #ddd;padding:6px;text-align:center;font-size:14px}
-  th{position:sticky;top:0;background:#f8f8f8}
-  .ok{background:#c9f7c0} .no{background:#ffd1d1}
-  .mono{font-variant-numeric:tabular-nums}
-  .small{font-size:12px;color:#666}
-  .pill{display:inline-block;padding:2px 6px;border-radius:999px;border:1px solid #999;margin-left:6px;font-size:12px}
+  :root{
+    --ok:#b7f3af;       /* green */
+    --no:#ffd4d4;       /* red */
+    --neutral:#eee;     /* grey */
+    --grid-border:#ddd;
+    --text:#222;
+    --muted:#666;
+    --accent:#0b5;
+  }
+  body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0}
+  .pill{border:1px solid #aaa;border-radius:999px;padding:2px 8px;font-size:12px;color:#444}
+  .muted{color:var(--muted);font-size:13px}
+  .tabs{display:flex;gap:8px;margin:14px 0}
+  .tab{padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer}
+  .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
+  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px}
+  .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
+  .s-ok{background:var(--ok)} .s-no{background:var(--no)} .s-unk{background:var(--neutral)}
+
+  /* Matrix */
+  .matrix-wrap{overflow-x:auto;border:1px solid var(--grid-border);border-radius:10px}
+  table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+  th,td{border-right:1px solid var(--grid-border);border-bottom:1px solid var(--grid-border)}
+  th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:13px}
+  th.day{min-width:120px;text-align:center}
+  th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:44px}
+  td{height:18px;width:120px;padding:0}
+  .cell{height:18px}
+  /* Day separators (vertical) */
+  .day-head{padding:6px 4px;border-bottom:1px solid var(--grid-border)}
+  .date{font-weight:600}
+  .dow{font-size:12px;color:var(--muted)}
+  .day-col{background:linear-gradient(to right, rgba(0,0,0,0.03) 0 0)}
+  .hour-label{padding:0 6px;font-size:12px;color:#555}
+  .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
+
+  /* Tooltip */
+  [title]{position:relative}
 </style>
-<h1>Wingfoil Windows – Québec Area <span class="pill">Local time</span></h1>
-<p class="small">Models via Open-Meteo (winds & tides). Times are local (America/Toronto).<br>
-Rules: Baie de Beauport ≥10 kn; Sainte-Anne-de-Beaupré SW & rising & ≥12 kn; St-Jean (Île d’Orléans) NE & falling & ≥12 kn.</p>
-<table id="grid"><thead></thead><tbody></tbody></table>
+
+<header>
+  <h1>Wingfoil Windows – Québec Area</h1>
+  <span class="pill">Local time (America/Toronto)</span>
+</header>
+<p class="muted">
+  Flip between spots below. Each grid shows <b>hours vertically (00–23)</b> and <b>days horizontally</b>.
+  Cells turn green only when your rules are met. Hover a cell to see wind (kn) and tide trend.
+</p>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="legend">
+  <span class="swatch s-ok"></span> Go &nbsp;
+  <span class="swatch s-no"></span> Not meeting rules &nbsp;
+  <span class="swatch s-unk"></span> Missing data
+</div>
+
+<div id="matrices"></div>
+
+<p class="footnote">
+  Rules:
+  <b>Baie de Beauport</b> ≥10 kn (any direction);
+  <b>Ste-Anne-de-Beaupré</b> SW 200–250° & rising tide & ≥12 kn;
+  <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥12 kn.
+  Wind direction degrees are hidden to keep the grid thin—check with a hover if you need details.
+</p>
+
 <script>
 (async function(){
+  // Load data
   let data;
   try{
     data = await fetch('forecast.json',{cache:'no-store'}).then(r=>r.json());
   }catch(e){
-    document.body.insertAdjacentHTML('beforeend','<p style="color:#b00">Could not load forecast.json. If you just set this up, run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');
+    document.body.insertAdjacentHTML('beforeend',
+      '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');
     return;
   }
-  const head = document.querySelector('#grid thead');
-  const body = document.querySelector('#grid tbody');
 
-  head.innerHTML = `
-    <tr>
-      <th>Time</th>
-      <th>Baie de Beauport<br><small>≥10 kn</small></th>
-      <th>Ste-Anne-de-Beaupré<br><small>SW 200–250° & Rising & ≥12 kn</small></th>
-      <th>St-Jean, Île d’Orléans<br><small>NE 30–70° & Falling & ≥12 kn</small></th>
-    </tr>`;
+  // Parse into a structure: days -> hours -> values per spot
+  // Spots: beauport, ste_anne, st_jean
+  const hours = data.hours || [];
+  if (!hours.length){
+    document.body.insertAdjacentHTML('beforeend',
+      '<p class="muted">No data yet. Run the “Update forecast” workflow, then refresh.</p>');
+    return;
+  }
 
-  for (const row of data.hours) {
-    const t = new Date(row.time).toLocaleString('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', day: '2-digit', month: '2-digit' });
-    const b = row.beauport  || {};
-    const s = row.ste_anne  || {};
-    const j = row.st_jean   || {};
+  // Group by local day string
+  const toLocal = s => new Date(s);
+  const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+  const dayLabel = d => d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
 
-    function cell(obj, key){
-      const go = obj.go && obj.go[key];
-      const wind = (obj.wind_kn ?? '-') + ' kn';
-      const dir  = (obj.dir_deg ?? '-') + '°';
-      const tide = (obj.tide ?? '-');
-      return `<td class="${go ? 'ok':'no'}">${wind}<br>${dir}<br><span class="small">${tide}</span></td>`;
+  const byDay = new Map();
+  for(const row of hours){
+    const t = toLocal(row.time);
+    const key = dayKey(t);
+    if(!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(row);
+  }
+
+  // Ensure each day's hours are sorted
+  for(const arr of byDay.values()){
+    arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
+  }
+
+  // Build per-spot matrices
+  const spots = [
+    {key:'beauport', label:'Baie de Beauport'},
+    {key:'ste_anne', label:'Ste-Anne-de-Beaupré'},
+    {key:'st_jean', label:'St-Jean, Île d’Orléans'},
+  ];
+
+  const tabBar = document.getElementById('tabs');
+  const matrices = document.getElementById('matrices');
+
+  spots.forEach((s,i)=>{
+    const tab = document.createElement('button');
+    tab.className = 'tab' + (i===0?' active':'');
+    tab.textContent = s.label;
+    tab.dataset.target = s.key;
+    tabBar.appendChild(tab);
+  });
+
+  function buildMatrix(spotKey){
+    // Create table: rows = 00..23, cols = days
+    const container = document.createElement('div');
+    container.className = 'matrix-wrap';
+    const tbl = document.createElement('table');
+
+    // Header row (empty corner + one th per day)
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+
+    const corner = document.createElement('th');
+    corner.className = 'hour';
+    corner.textContent = 'Hour';
+    htr.appendChild(corner);
+
+    const dayOrder = Array.from(byDay.keys()).sort((a,b)=> new Date(a)-new Date(b));
+    dayOrder.forEach(dk=>{
+      const th = document.createElement('th');
+      th.className = 'day';
+      const dt = new Date(dk + 'T00:00:00-04:00'); // display only
+      th.innerHTML = `<div class="day-head"><div class="date">${dayLabel(dt)}</div></div>`;
+      htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    tbl.appendChild(thead);
+
+    // Build a map for quick access: map[dayKey][hour] = row[spotKey]
+    const map = {};
+    dayOrder.forEach(k=>{
+      map[k] = {};
+      const arr = byDay.get(k) || [];
+      arr.forEach(row=>{
+        const h = new Date(row.time).toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:'America/Toronto' });
+        map[k][h] = row[spotKey] || {};
+      });
+    });
+
+    const tbody = document.createElement('tbody');
+
+    for(let hour=0; hour<24; hour++){
+      const hrStr = hour.toString().padStart(2,'0');
+      const tr = document.createElement('tr');
+
+      const th = document.createElement('th');
+      th.className = 'hour';
+      th.innerHTML = `<span class="hour-label">${hrStr}</span>`;
+      tr.appendChild(th);
+
+      dayOrder.forEach(dk=>{
+        const obj = map[dk][hrStr] || {};
+        const go = obj.go ? (obj.go.beauport ?? obj.go.ste_anne ?? obj.go.st_jean) : false;
+        // Determine background:
+        let bg = 'var(--neutral)';
+        if (obj.wind_kn == null) {
+          bg = 'var(--neutral)';
+        } else if (go) {
+          bg = 'var(--ok)';
+        } else {
+          bg = 'var(--no)';
+        }
+        const td = document.createElement('td');
+        const tide = (obj.tide ?? 'unknown');
+        const w = (obj.wind_kn == null ? '-' : obj.wind_kn + ' kn');
+        // we hide degrees to keep it thin; still include in tooltip if present
+        const deg = (obj.dir_deg == null ? '' : `, ${obj.dir_deg}°`);
+        td.innerHTML = `<div class="cell" title="${dk} ${hrStr}:00 — ${w}${deg} • tide: ${tide}"></div>`;
+        td.querySelector('.cell').style.background = bg;
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
     }
 
-    body.insertAdjacentHTML('beforeend', `
-      <tr>
-        <td class="mono">${t}</td>
-        ${cell(b,'beauport')}
-        ${cell(s,'ste_anne')}
-        ${cell(j,'st_jean')}
-      </tr>`);
+    tbl.appendChild(tbody);
+    container.appendChild(tbl);
+    return container;
   }
+
+  // Render all matrices but show only active one
+  const views = {};
+  spots.forEach((s,i)=>{
+    const v = buildMatrix(s.key);
+    v.style.display = i===0 ? 'block':'none';
+    v.id = 'view-'+s.key;
+    matrices.appendChild(v);
+    views[s.key] = v;
+  });
+
+  // Tab switching
+  tabBar.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.tab');
+    if(!btn) return;
+    [...tabBar.children].forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const target = btn.dataset.target;
+    Object.values(views).forEach(v=>v.style.display='none');
+    views[target].style.display = 'block';
+  });
 })();
 </script>
 </html>

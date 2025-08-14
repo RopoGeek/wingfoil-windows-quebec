@@ -1,9 +1,9 @@
-# check_spots.py — gust-based rules + robust tide "finder" around each spot
-# - Uses Open-Meteo (no API key) for hourly: wind gusts, mean wind, direction, and tide height
+# check_spots.py — gust-based rules + DFO SPINE water-level forecasts for tide trend
+# - Wind: Open-Meteo (gusts, mean, direction) — no API key
+# - Water level: DFO SPINE ("St. Lawrence river interpolated water level forecast") — no API key
 # - "Go" is evaluated on GUST speed (kn)
-# - Tide: if the exact coordinate has no tide data, probe nearby points and use the first valid series
 
-import json, datetime as dt, urllib.request, urllib.parse, sys, math
+import json, datetime as dt, urllib.request, urllib.parse, sys
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
@@ -16,14 +16,10 @@ SPOTS = {
     "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169},
 }
 
-# Gust thresholds (kn)
-THRESHOLD_GUST = {
-    "beauport": 10.0,
-    "ste_anne": 10.0,  # was 12.0
-    "st_jean":  10.0,  # was 12.0
-}
+# Gust thresholds (kn) — edit here if you change rules later
+THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
 
-# Direction sectors (degrees, "from"):
+# Direction sectors (degrees, "from")
 DIR_SW = (200, 250)  # Ste-Anne
 DIR_NE = (30, 70)    # St-Jean
 
@@ -33,10 +29,11 @@ def is_dir_in_sector(deg, lo, hi):
 def in_SW(deg): return is_dir_in_sector(deg, *DIR_SW)
 def in_NE(deg): return is_dir_in_sector(deg, *DIR_NE)
 
-def om_get(url):
+def http_get_json(url):
     with urllib.request.urlopen(url, timeout=30) as r:
         return json.load(r)
 
+# ---------- WIND (Open-Meteo) ----------
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
@@ -47,135 +44,102 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
         "start_date": start_dt.date().isoformat(),
         "end_date": end_dt.date().isoformat()
     })
-    return om_get(f"{base}?{qs}")
+    return http_get_json(f"{base}?{qs}")
 
-def fetch_open_meteo_tide(lat, lon, start_dt, end_dt):
-    base = "https://marine-api.open-meteo.com/v1/marine"
-    qs = urllib.parse.urlencode({
-        "latitude": lat, "longitude": lon,
-        "hourly": "tide_height",
-        "timezone": "America/Toronto",
-        "start_date": start_dt.date().isoformat(),
-        "end_date": end_dt.date().isoformat()
-    })
-    return om_get(f"{base}?{qs}")
+# ---------- WATER LEVEL (DFO SPINE) ----------
+# Docs: https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/swagger-ui/index.html (via CHS web services page)
+# Endpoint: /rest/v1/waterLevel?lat=...&lon=...&t=... (you can repeat lat/lon/t multiple times in one request)
+def fetch_spine_levels(lat, lon, times_utc_iso):
+    base = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
+    # Build query with repeated params: lat=...&lat=...&lon=...&lon=...&t=...&t=...
+    q = []
+    for t in times_utc_iso:
+        q.append(("lat", f"{lat}"))
+        q.append(("lon", f"{lon}"))
+        q.append(("t", t))
+    qs = urllib.parse.urlencode(q)
+    data = http_get_json(f"{base}?{qs}")
+    # Response: {"responseItems":[{"status":"OK","waterLevel":..., "instant":"2023-...Z", ...}, ...]}
+    items = data.get("responseItems", [])
+    out = {}
+    for it in items:
+        if it.get("status") == "OK" and "waterLevel" in it and "instant" in it:
+            out[it["instant"]] = it["waterLevel"]
+    return out  # dict[utc_iso] -> level (m, chart datum)
 
-def tide_trend(series, idx):
+def tide_trend(levels, idx):
+    # levels: list of floats (may include None) aligned by time index
     try:
-        prev_h = float(series[idx-1]) if idx-1 >= 0 and series[idx-1] is not None else None
-        cur_h  = float(series[idx])   if series[idx] is not None else None
-        next_h = float(series[idx+1]) if idx+1 < len(series) and series[idx+1] is not None else None
+        prev_h = float(levels[idx-1]) if idx-1 >= 0 and levels[idx-1] is not None else None
+        cur_h  = float(levels[idx])   if levels[idx]   is not None else None
+        next_h = float(levels[idx+1]) if idx+1 < len(levels) and levels[idx+1] is not None else None
     except (ValueError, TypeError):
         return "unknown"
     if prev_h is None or next_h is None or cur_h is None:
         return "unknown"
+    # trend over consecutive hours
     if next_h > cur_h > prev_h: return "rising"
     if next_h < cur_h < prev_h: return "falling"
     if abs(next_h-cur_h) < 0.02 and abs(cur_h-prev_h) < 0.02: return "slack"
     return "rising" if next_h > prev_h else "falling" if next_h < prev_h else "unknown"
 
-def has_meaningful_tide(vals):
-    # At least some non-None values and not all identical
-    clean = [v for v in vals if v is not None]
-    if len(clean) < 3:
-        return False
-    return not all(abs(clean[i] - clean[0]) < 1e-6 for i in range(1, len(clean)))
-
-def probe_coords(lat, lon):
-    """
-    Generate nearby coordinates to try for tide data.
-    Start with the exact point, then a small ring around (~0.05°), then a bit wider (~0.1°).
-    """
-    deltas = [0.0, 0.05, -0.05, 0.05, -0.05, 0.0, 0.0, 0.1, -0.1, 0.1, -0.1]
-    pairs = []
-    # exact
-    pairs.append((lat, lon))
-    # small ring (N,S,E,W)
-    pairs += [(lat+deltas[1], lon),
-              (lat+deltas[2], lon),
-              (lat, lon+deltas[1]),
-              (lat, lon+deltas[2])]
-    # diagonals small
-    pairs += [(lat+deltas[1], lon+deltas[1]),
-              (lat+deltas[1], lon+deltas[2]),
-              (lat+deltas[2], lon+deltas[1]),
-              (lat+deltas[2], lon+deltas[2])]
-    # slightly wider ring
-    pairs += [(lat+0.1, lon), (lat-0.1, lon), (lat, lon+0.1), (lat, lon-0.1)]
-    return pairs
-
-def find_working_tide_series(lat, lon, start_dt, end_dt):
-    """
-    Try multiple nearby points; return (times, values, used_lat, used_lon) for the first that has meaningful tide.
-    If none work, return ([], [], None, None).
-    """
-    for (tlat, tlon) in probe_coords(lat, lon):
-        try:
-            tj = fetch_open_meteo_tide(tlat, tlon, start_dt, end_dt)
-            times = tj.get("hourly", {}).get("time", [])
-            vals  = tj.get("hourly", {}).get("tide_height", [])
-            if times and vals and has_meaningful_tide(vals):
-                return times, vals, tlat, tlon
-        except Exception as e:
-            print(f"[WARN] Tide fetch failed @ ({tlat:.4f},{tlon:.4f}): {e}", file=sys.stderr)
-    return [], [], None, None
-
 def main():
-    start = NOW
-    end = NOW + dt.timedelta(hours=HOURS)
+    start_local = NOW
+    end_local = NOW + dt.timedelta(hours=HOURS)
     result = {"generated_at": NOW.isoformat(), "hours": []}
 
-    spot_data = {}
+    # Build the master hourly timeline in local time (we’ll convert to UTC for SPINE)
+    timeline_local = [start_local + dt.timedelta(hours=i) for i in range(HOURS)]
+    timeline_iso_local = [t.isoformat() for t in timeline_local]
+    # For SPINE, convert to UTC Z ISO strings
+    timeline_utc = [t.astimezone(dt.timezone.utc) for t in timeline_local]
+    timeline_iso_utc = [t.replace(tzinfo=dt.timezone.utc).isoformat().replace("+00:00","Z") for t in timeline_utc]
+
+    # Pre-fetch wind for each spot
+    wind = {}
     for key, spot in SPOTS.items():
-        # Wind (gust + mean + direction)
         try:
-            wjson = fetch_open_meteo_wind(spot["lat"], spot["lon"], start, end)
-            hours = wjson["hourly"]["time"]
-            wind_avg = wjson["hourly"]["windspeed_10m"]      # kn
-            wind_gust = wjson["hourly"]["windgusts_10m"]     # kn
-            dirs  = wjson["hourly"]["winddirection_10m"]     # deg
+            wjson = fetch_open_meteo_wind(spot["lat"], spot["lon"], start_local, end_local)
+            w_hours = wjson["hourly"]["time"]                 # local timestamps
+            w_avg   = wjson["hourly"]["windspeed_10m"]        # kn
+            w_gust  = wjson["hourly"]["windgusts_10m"]        # kn
+            w_dir   = wjson["hourly"]["winddirection_10m"]    # deg
+            wind[key] = {"time": w_hours, "avg": w_avg, "gust": w_gust, "dir": w_dir}
         except Exception as e:
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
-            hours, wind_avg, wind_gust, dirs = [], [], [], []
+            wind[key] = {"time": [], "avg": [], "gust": [], "dir": []}
 
-        # Tide (robust: try nearby points)
-        tide_times, tide_vals, used_lat, used_lon = find_working_tide_series(
-            spot["lat"], spot["lon"], start, end
-        )
-        if not tide_times:
-            print(f"[INFO] No tide found near {spot['name']} ({spot['lat']},{spot['lon']})", file=sys.stderr)
-        else:
-            print(f"[INFO] Tide source for {spot['name']}: ({used_lat:.4f},{used_lon:.4f})", file=sys.stderr)
+    # Fetch SPINE water-level series for each spot in one batch per spot
+    # (multiple lat/lon/t in the same request)
+    tide_levels = {}
+    for key, spot in SPOTS.items():
+        try:
+            lvl_by_instant = fetch_spine_levels(spot["lat"], spot["lon"], timeline_iso_utc)
+            # Re-align to our UTC timeline order
+            series = [lvl_by_instant.get(t_utc) for t_utc in timeline_iso_utc]
+        except Exception as e:
+            print(f"[WARN] SPINE fetch failed for {spot['name']}: {e}", file=sys.stderr)
+            series = [None]*HOURS
+        tide_levels[key] = series
 
-        spot_data[key] = {
-            "hours": hours, "avg": wind_avg, "gust": wind_gust, "dirs": dirs,
-            "tide_times": tide_times, "tide_vals": tide_vals
-        }
-
-    # Use Beauport timeline as backbone
-    timeline = spot_data["beauport"]["hours"] or []
-    for t in timeline:
-        row = {"time": t}
+    # Compose rows by hour
+    for i, t_loc_iso in enumerate(timeline_iso_local):
+        row = {"time": t_loc_iso}
         for key in SPOTS.keys():
+            # Find wind for the same local hour by string match
             gust = avg = d = None
-            tide_status = "unknown"
-
-            # align wind arrays at timestamp t
             try:
-                idx = spot_data[key]["hours"].index(t)
-                gust = float(spot_data[key]["gust"][idx]) if spot_data[key]["gust"][idx] is not None else None
-                avg  = float(spot_data[key]["avg"][idx])  if spot_data[key]["avg"][idx]  is not None else None
-                d    = float(spot_data[key]["dirs"][idx]) if spot_data[key]["dirs"][idx] is not None else None
+                w_times = wind[key]["time"]
+                idx = w_times.index(t_loc_iso)
+                gust = float(wind[key]["gust"][idx]) if wind[key]["gust"][idx] is not None else None
+                avg  = float(wind[key]["avg"][idx])  if wind[key]["avg"][idx]  is not None else None
+                d    = float(wind[key]["dir"][idx])  if wind[key]["dir"][idx]  is not None else None
             except Exception:
                 pass
 
-            # align tide by timestamp t (if any)
-            try:
-                tidx = spot_data[key]["tide_times"].index(t)
-                tide_status = tide_trend(spot_data[key]["tide_vals"], tidx)
-            except Exception:
-                pass
+            tide_status = tide_trend(tide_levels[key], i) if tide_levels.get(key) else "unknown"
 
+            # Evaluate rules on gust
             thr = THRESHOLD_GUST[key]
             if key == "beauport":
                 go_flag = (gust is not None and gust >= thr)

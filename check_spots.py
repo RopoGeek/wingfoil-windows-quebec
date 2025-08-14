@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
-HOURS = 72  # look ahead
+HOURS = 96  # look ahead
 
 SPOTS = {
     "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},

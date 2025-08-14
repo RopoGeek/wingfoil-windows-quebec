@@ -15,8 +15,8 @@ SPOTS = {
 # >>> Edit these if you want different thresholds later (gusts, in knots):
 THRESHOLD_GUST = {
     "beauport": 10.0,
-    "ste_anne": 10.0,   # was 12.0
-    "st_jean":  10.0,   # was 12.0
+    "ste_anne": 10.0,   # must be 10.0 now
+    "st_jean":  10.0,   # must be 10.0 now
 }
 
 # Direction sectors (degrees, "from"):

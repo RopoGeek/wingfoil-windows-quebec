@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-08-15T15:00:00-04:00",
+  "generated_at": "2025-08-15T16:00:00-04:00",
   "hours": [
     {
       "time": "2025-08-15T00:00",
@@ -511,7 +511,7 @@
         "wind_kn": 4.9,
         "wind_avg_kn": 4.7,
         "dir_deg": 114,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -522,7 +522,7 @@
         "wind_kn": 3.1,
         "wind_avg_kn": 3.0,
         "dir_deg": 45,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -533,7 +533,7 @@
         "wind_kn": 4.3,
         "wind_avg_kn": 4.0,
         "dir_deg": 349,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -547,7 +547,7 @@
         "wind_kn": 3.9,
         "wind_avg_kn": 3.8,
         "dir_deg": 102,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -558,7 +558,7 @@
         "wind_kn": 5.1,
         "wind_avg_kn": 4.8,
         "dir_deg": 47,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -569,7 +569,7 @@
         "wind_kn": 4.7,
         "wind_avg_kn": 4.3,
         "dir_deg": 350,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -4330,21 +4330,21 @@
   },
   "debug_counts": {
     "beauport": {
-      "unknown": 14,
+      "unknown": 15,
       "slack": 1,
-      "falling": 62,
+      "falling": 61,
       "rising": 43
     },
     "ste_anne": {
-      "unknown": 14,
+      "unknown": 15,
       "slack": 1,
-      "falling": 62,
+      "falling": 61,
       "rising": 43
     },
     "st_jean": {
-      "unknown": 14,
+      "unknown": 15,
       "slack": 1,
-      "falling": 62,
+      "falling": 61,
       "rising": 43
     }
   }

@@ -5,12 +5,17 @@
 <title>Wingfoil Windows – Québec Area</title>
 <style>
   :root{
-    --ok:#b7f3af;       /* green */
-    --no:#ffd4d4;       /* red */
-    --neutral:#eee;     /* grey */
+    --ok:#b7f3af;       /* green cell */
+    --no:#ffd4d4;       /* red cell */
+    --neutral:#eee;     /* grey cell */
     --grid-border:#ddd;
     --text:#222;
     --muted:#666;
+
+    --tide-rise:#0a6;   /* dark green text bg for Rising */
+    --tide-fall:#b00;   /* dark red text bg for Falling */
+    --tide-slack:#888;  /* grey for Slack */
+    --tide-unk:#aaa;    /* muted for Unknown */
   }
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
   header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -25,9 +30,10 @@
   }
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
   .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
-  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px}
+  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px;flex-wrap:wrap}
   .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
   .s-ok{background:var(--ok)} .s-no{background:var(--no)} .s-unk{background:var(--neutral)}
+  .s-sep{width:30px;height:0;border-top:3px solid #999;margin-left:4px;margin-right:2px}
 
   /* Matrix */
   .matrix-wrap{overflow-x:auto;border:1px solid var(--grid-border);border-radius:10px}
@@ -36,12 +42,24 @@
   th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:12px}
   th.day{min-width:80px;text-align:center}
   th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:44px}
+  th.tidecol{position:sticky;left:44px;background:#fafafa;font-weight:500;width:64px}
   td{height:18px;width:56px;padding:0}  /* narrow columns */
   .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
+  /* tide chips */
+  .tide-chip{
+    font-size:11px; line-height:1; padding:2px 6px; border-radius:6px; color:#fff; display:inline-block;
+    min-width:56px; text-align:center;
+  }
+  .tide-rise{ background:var(--tide-rise); }
+  .tide-fall{ background:var(--tide-fall); }
+  .tide-slack{ background:#eee; color:#333; border:1px solid #ccc; }
+  .tide-unk{ background:#f2f2f2; color:#888; border:1px solid #ddd; }
+  /* separator rows when Rising↔Falling flips on baseline */
+  tr.sep > th, tr.sep > td { border-top:3px solid #999 !important; }
 </style>
 
 <header>
@@ -65,7 +83,8 @@
 <div class="legend">
   <span class="swatch s-ok"></span> Go (gust meets rule) &nbsp;
   <span class="swatch s-no"></span> Not meeting rules &nbsp;
-  <span class="swatch s-unk"></span> Missing data
+  <span class="swatch s-unk"></span> Missing data &nbsp; | &nbsp;
+  <span class="s-sep"></span> Rising ↔ Falling boundary (baseline)
 </div>
 
 <div id="matrices"></div>
@@ -82,12 +101,9 @@
 (async function(){
   // Default view mode
   let VIEW = 'daylight'; // 'daylight' | 'all'
-  const HOUR_RANGE = {
-    daylight:[6,21],
-    all:[0,23],
-  };
+  const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
 
-  // Load data
+  // Load data (cache-busted)
   let data;
   try{
     data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
@@ -124,18 +140,30 @@
     </svg>`;
   }
 
-  // Group by day
-  const byDay = new Map();
+  // Group ALL rows by day for quick access
+  const byDayAll = new Map(); // day -> array of rows (full objects with all 3 spots)
   for(const row of hours){
     const t = toLocal(row.time);
     const k = dayKey(t);
-    if(!byDay.has(k)) byDay.set(k, []);
-    byDay.get(k).push(row);
+    if(!byDayAll.has(k)) byDayAll.set(k, []);
+    byDayAll.get(k).push(row);
   }
-  for(const arr of byDay.values()){
+  for(const arr of byDayAll.values()){
     arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
   }
-  const dayOrder = Array.from(byDay.keys()).sort((a,b)=> new Date(a)-new Date(b));
+  const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
+
+  // Build a quick lookup map for baseline (Beauport) tide per day/hour
+  const baselineTide = {}; // { dayKey: { "06": "rising", ... } }
+  dayOrder.forEach(k=>{
+    baselineTide[k] = {};
+    const arr = byDayAll.get(k) || [];
+    for(const row of arr){
+      const h = hourStr(new Date(row.time));
+      const tide = row.beauport ? (row.beauport.tide ?? 'unknown') : 'unknown';
+      baselineTide[k][h] = tide;
+    }
+  });
 
   const spots = [
     {key:'beauport', label:'Baie de Beauport'},
@@ -155,6 +183,14 @@
     tabBar.appendChild(tab);
   });
 
+  function tideChipHTML(state){
+    const s = (state||'unknown').toLowerCase();
+    if (s==='rising')  return `<span class="tide-chip tide-rise">Rising</span>`;
+    if (s==='falling') return `<span class="tide-chip tide-fall">Falling</span>`;
+    if (s==='slack')   return `<span class="tide-chip tide-slack">Slack</span>`;
+    return `<span class="tide-chip tide-unk">Unknown</span>`;
+  }
+
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = HOUR_RANGE[mode];
 
@@ -171,6 +207,11 @@
     corner.textContent = 'Hour';
     htr.appendChild(corner);
 
+    const hTide = document.createElement('th');
+    hTide.className = 'tidecol';
+    hTide.textContent = 'Tide';
+    htr.appendChild(hTide);
+
     dayOrder.forEach(dk=>{
       const th = document.createElement('th');
       th.className = 'day';
@@ -185,7 +226,7 @@
     const map = {};
     dayOrder.forEach(k=>{
       map[k] = {};
-      const arr = byDay.get(k) || [];
+      const arr = byDayAll.get(k) || [];
       arr.forEach(row=>{
         const h = hourStr(new Date(row.time));
         map[k][h] = row[spotKey] || {};
@@ -193,17 +234,40 @@
     });
 
     const tbody = document.createElement('tbody');
+    let prevBaseline = null;
+
     for(let hour=HSTART; hour<=HEND; hour++){
       const hrStr = hour.toString().padStart(2,'0');
       const tr = document.createElement('tr');
 
+      // Hour header
       const th = document.createElement('th');
       th.className = 'hour';
       th.innerHTML = `<span class="hour-label">${hrStr}</span>`;
       tr.appendChild(th);
 
+      // Tide column (baseline = Beauport)
+      // Use the FIRST day’s baseline for the separator check; for display we show "--" if mixed across days.
+      // But for quick grasp, we show the baseline of the FIRST day column.
+      let firstDayTide = baselineTide[dayOrder[0]] ? (baselineTide[dayOrder[0]][hrStr] || 'unknown') : 'unknown';
+      const tdTide = document.createElement('th');
+      tdTide.className = 'tidecol';
+      tdTide.innerHTML = tideChipHTML(firstDayTide);
+      tr.appendChild(tdTide);
+
+      // Separator logic: add thick line when baseline flips Rising↔Falling from previous hour
+      const flip = (a,b) => {
+        const A=a&&a.toLowerCase(), B=b&&b.toLowerCase();
+        return (A==='rising' && B==='falling') || (A==='falling' && B==='rising');
+      };
+      if (prevBaseline!==null && flip(prevBaseline, firstDayTide)){
+        tr.classList.add('sep');
+      }
+      prevBaseline = firstDayTide;
+
+      // Data cells
       dayOrder.forEach(dk=>{
-        const obj = map[dk][hrStr] || {};
+        const obj = (map[dk] && map[dk][hrStr]) ? map[dk][hrStr] : {};
         const go = obj.go ? (obj.go.beauport ?? obj.go.ste_anne ?? obj.go.st_jean) : false;
 
         let bg = 'var(--neutral)';
@@ -239,6 +303,11 @@
   function render(mode){
     matrices.innerHTML = '';
     const views = {};
+    const spots = [
+      {key:'beauport', label:'Baie de Beauport'},
+      {key:'ste_anne', label:'Ste-Anne-de-Beaupré'},
+      {key:'st_jean', label:'St-Jean, Île d’Orléans'},
+    ];
     spots.forEach((s,i)=>{
       const v = buildMatrix(s.key, mode);
       v.style.display = i===0 ? 'block':'none';

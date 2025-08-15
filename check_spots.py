@@ -37,12 +37,15 @@ def http_get_json(url, timeout=45):
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
-        "latitude": lat, "longitude": lon,
+        "latitude": lat,
+        "longitude": lon,
         "hourly": "windspeed_10m,windgusts_10m,winddirection_10m",
         "wind_speed_unit": "kn",
         "timezone": "America/Toronto",
         "start_date": start_dt.date().isoformat(),
         "end_date": end_dt.date().isoformat(),
+        # ↓ Your priority: HRDPS > NAM > HRRR
+        "models": "hrdps,nam_conus,hrrr"
     })
     return http_get_json(f"{base}?{qs}")
 

@@ -1,20 +1,18 @@
-# check_spots.py — Fast + robust tides via a single SPINE baseline + per-spot time offsets
+# check_spots.py — Fast + robust tides via one SPINE baseline + per-spot time offsets
+# FIXED: tide classification now tolerates SPINE instants that aren't exactly on the hour
 # Wind: Open-Meteo (gust/mean/dir) — no key
-# Tide: DFO SPINE water-level forecast at one reliable "baseline" location (batched to avoid 414)
+# Tide: DFO SPINE water-level forecast at one reliable "baseline" location (batched; avoids 414)
 #       Other spots' tide states are estimated by time-shifting the baseline (separate offsets for rising/falling).
-#
-# Edit these OFFSETS to tune timing per spot. Units: minutes.
-# Negative = that spot's tide happens EARLIER than baseline. Positive = LATER than baseline.
 
-import json, datetime as dt, urllib.request, urllib.parse, sys, time
+import json, datetime as dt, urllib.request, urllib.parse, sys, time, bisect
 from zoneinfo import ZoneInfo
+from collections import Counter
 
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
 HOURS = 96  # 4 days
 
 # ----------------------- CONFIG -----------------------
-# Display/wind coordinates (unchanged)
 SPOTS = {
     "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},
     "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280},
@@ -29,25 +27,25 @@ DIR_SW = (200, 250)  # Ste-Anne
 DIR_NE = (30, 70)    # St-Jean
 
 # Baseline tide candidates (mid-channel points around Québec City)
-# We'll try these in order; first that returns OK points becomes the baseline.
 BASELINE_CANDIDATES = [
-    (46.8609, -71.1835),  # your earlier Beauport seed that once worked
-    (46.8420, -71.2100),  # mid-channel S of Beauport
-    (46.8750, -71.1600),  # mid-channel NE of Beauport
-    (46.8350, -71.2450),  # mid-channel SW
+    (46.8609, -71.1835),  # seed that worked before
+    (46.8420, -71.2100),
+    (46.8750, -71.1600),
+    (46.8350, -71.2450),
 ]
 
-# Offsets (minutes) relative to the baseline for each spot.
-# We allow different values for rising vs falling because rising tends to propagate faster.
-# Tune these numbers after a few days of observation. Signs: negative = earlier than baseline.
+# Offsets (minutes) relative to the baseline for each spot (rising vs falling).
+# Negative = earlier than baseline; positive = later.
 TIDE_OFFSETS_MIN = {
-    "beauport": {"rising": 0,   "falling": 0},    # the baseline itself
-    "ste_anne": {"rising": -25, "falling": -15},  # Ste-Anne generally downriver → a bit earlier
-    "st_jean":  {"rising": -15, "falling": -10},  # Île d’Orléans (St-Jean) slightly earlier than QC
+    "beauport": {"rising": 0,   "falling": 0},
+    "ste_anne": {"rising": -25, "falling": -15},
+    "st_jean":  {"rising": -15, "falling": -10},
 }
 
 # How strict to be when deciding rising/falling between consecutive hours (meters)
 EPS_TIDE = 0.02
+# How far from the requested hour we allow SPINE instants to be matched (minutes)
+MAX_T_MATCH_MIN = 75
 
 # ----------------------- HELPERS -----------------------
 def is_dir_in_sector(deg, lo, hi):
@@ -109,15 +107,42 @@ def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries
                 time.sleep(pause)
     return out
 
-def classify_trend_from_map(spine_map, t_utc_iso, t1_utc_iso, eps=EPS_TIDE):
-    v0 = spine_map.get(t_utc_iso)
-    v1 = spine_map.get(t1_utc_iso)
+# ---- tolerant nearest lookup (within ±MAX_T_MATCH_MIN) ----
+def build_sorted_series(spine_map):
+    """Return (times_utc, values) where times_utc is a sorted list of aware datetimes in UTC."""
+    times, vals = [], []
+    for ts, v in spine_map.items():
+        try:
+            t = dt.datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(dt.timezone.utc)
+            times.append(t); vals.append(float(v))
+        except Exception:
+            continue
+    order = sorted(range(len(times)), key=lambda i: times[i])
+    times = [times[i] for i in order]
+    vals  = [vals[i] for i in order]
+    return times, vals
+
+def nearest_value(times, vals, target_dt_utc, max_minutes=MAX_T_MATCH_MIN):
+    if not times:
+        return None
+    i = bisect.bisect_left(times, target_dt_utc)
+    cand = []
+    if i < len(times): cand.append(i)
+    if i > 0: cand.append(i-1)
+    best = None; best_dt = None
+    for idx in cand:
+        dt_i = times[idx]
+        if abs((dt_i - target_dt_utc).total_seconds()) <= max_minutes*60:
+            if best is None or abs((dt_i - target_dt_utc).total_seconds()) < abs((best_dt - target_dt_utc).total_seconds()):
+                best = vals[idx]; best_dt = dt_i
+    return best
+
+def classify_trend_from_series(times, vals, t0_utc, t1_utc, eps=EPS_TIDE):
+    v0 = nearest_value(times, vals, t0_utc)
+    v1 = nearest_value(times, vals, t1_utc)
     if v0 is None or v1 is None:
         return "unknown"
-    try:
-        dv = float(v1) - float(v0)
-    except Exception:
-        return "unknown"
+    dv = v1 - v0
     if dv > eps: return "rising"
     if dv < -eps: return "falling"
     return "slack"
@@ -159,38 +184,44 @@ def main():
         utc_hours.append(a)
         utc_pairs.append((a,b))
 
-    # 3) Find a baseline tide series: try candidates in order, pick the first that returns enough points
-    flat_times = [ts for p in utc_pairs for ts in p]  # t and t+1 for each hour
+    # 3) Find a baseline tide series
+    flat_times = [ts for p in utc_pairs for ts in p]
     baseline_map = {}
     baseline_latlon = None
+    # use a smaller trial (first 24 hours) to choose baseline
+    trial = flat_times[:48] if len(flat_times) >= 48 else flat_times
     for (plat, plon) in BASELINE_CANDIDATES:
-        test_map = spine_levels_batch(plat, plon, flat_times[:48], chunk_size=24)  # small test (~24 hours worth)
-        ok_test  = sum(1 for ts in flat_times[:48] if ts in test_map)
+        test_map = spine_levels_batch(plat, plon, trial, chunk_size=24)
+        ok_test  = sum(1 for ts in trial if ts in test_map)
         print(f"[INFO] Baseline test @({plat},{plon}): {ok_test} OK trial points", file=sys.stderr)
-        if ok_test >= 12:  # need at least half of the small test points
+        if ok_test >= max(8, len(trial)//3):
             print(f"[INFO] Baseline SELECTED @({plat},{plon}) — fetching full horizon", file=sys.stderr)
             baseline_map = spine_levels_batch(plat, plon, flat_times, chunk_size=36)
             baseline_latlon = (plat, plon)
             break
 
-    # Build baseline trend per hour (if we have baseline_map)
-    baseline_trend = {}  # dict[utc_hour] -> "rising"/"falling"/"slack"/"unknown"
-    for (a,b) in utc_pairs:
-        baseline_trend[a] = classify_trend_from_map(baseline_map, a, b)
+    # Build tolerant baseline trend per hour
+    baseline_trend = {}
+    if baseline_map:
+        times, vals = build_sorted_series(baseline_map)
+        for (a,b) in utc_pairs:
+            t0 = dt.datetime.fromisoformat(a.replace("Z","+00:00")).astimezone(dt.timezone.utc)
+            t1 = dt.datetime.fromisoformat(b.replace("Z","+00:00")).astimezone(dt.timezone.utc)
+            baseline_trend[a] = classify_trend_from_series(times, vals, t0, t1)
+    else:
+        print("[INFO] No baseline tide map selected; tides will be 'unknown'", file=sys.stderr)
 
-    # Helper to get trend at a *shifted* time:
-    # shift_minutes >0 means look LATER on the baseline; <0 look EARLIER.
     def get_baseline_trend_shifted(utc_hour_iso, shift_minutes):
+        # nearest hour in utc_hours after applying the offset
         try:
-            t = dt.datetime.fromisoformat(utc_hour_iso.replace("Z","+00:00"))
+            t = dt.datetime.fromisoformat(utc_hour_iso.replace("Z","+00:00")).astimezone(dt.timezone.utc)
         except Exception:
             return "unknown"
         t_shift = t + dt.timedelta(minutes=shift_minutes)
-        # snap to nearest hour in utc_hours
-        # (timeline is hourly; pick nearest index)
-        diffs = [(abs((t_shift - dt.datetime.fromisoformat(u.replace("Z","+00:00"))).total_seconds()), idx) for idx,u in enumerate(utc_hours)]
-        if not diffs:
-            return "unknown"
+        # pick nearest utc_hours entry
+        diffs = [(abs((t_shift - dt.datetime.fromisoformat(u.replace("Z","+00:00")).astimezone(dt.timezone.utc)).total_seconds()), idx)
+                 for idx, u in enumerate(utc_hours)]
+        if not diffs: return "unknown"
         _, idx = min(diffs, key=lambda x: x[0])
         return baseline_trend.get(utc_hours[idx], "unknown")
 
@@ -209,11 +240,10 @@ def main():
             except Exception:
                 pass
 
-            # Tide trend:
-            if baseline_latlon is None:
+            # Tide trend using baseline + offsets
+            if not baseline_trend:
                 tide_status = "unknown"
             else:
-                # Determine which offset to use (based on *baseline* phase at this hour)
                 phase_now = baseline_trend.get(utc_hour, "unknown")
                 offs = TIDE_OFFSETS_MIN[key]
                 shift = offs["rising"] if phase_now == "rising" else offs["falling"] if phase_now == "falling" else 0
@@ -232,7 +262,7 @@ def main():
 
             row[key] = {
                 "wind_kn": round(gust, 1) if gust is not None else None,       # gusts
-                "wind_avg_kn": round(avg, 1) if avg is not None else None,     # mean wind (info only)
+                "wind_avg_kn": round(avg, 1) if avg is not None else None,     # mean wind
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {
@@ -244,11 +274,20 @@ def main():
 
         result["hours"].append(row)
 
-    # Add a little metadata so you can see which baseline was used in Actions logs (and if none)
+    # Debug counts so you can verify tides are being produced
+    def count_trend(map_rows, key):
+        return dict(Counter(r.get(key, {}).get("tide", "unknown") for r in map_rows))
+
     result["tide_baseline"] = {
         "lat": baseline_latlon[0] if baseline_latlon else None,
         "lon": baseline_latlon[1] if baseline_latlon else None,
-        "note": "Tide for Ste-Anne & St-Jean is time-shifted from the baseline using TIDE_OFFSETS_MIN."
+        "max_match_minutes": MAX_T_MATCH_MIN,
+        "note": "Ste-Anne & St-Jean tides are time-shifted from baseline using TIDE_OFFSETS_MIN.",
+    }
+    result["debug_counts"] = {
+        "beauport": count_trend(result["hours"], "beauport"),
+        "ste_anne": count_trend(result["hours"], "ste_anne"),
+        "st_jean":  count_trend(result["hours"], "st_jean"),
     }
 
     with open("forecast.json", "w", encoding="utf-8") as f:

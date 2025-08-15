@@ -42,8 +42,8 @@ BASELINE_CANDIDATES = [
 ]
 
 # Tide classification tuning
-EPS_TIDE = 0.02           # meters; delta to call rising/falling vs slack
-MAX_T_MATCH_MIN = 75      # tolerate ±75 min difference for matching SPINE instants
+EPS_TIDE = 0.02            # meters; delta to call rising/falling vs slack
+MAX_T_MATCH_MIN = 150      # tolerate ±150 min difference for matching SPINE instants
 
 # CHS-style phase offsets (minutes): rising uses LLW offset; falling uses HHW offset
 TIDE_PHASE_OFFSETS = {
@@ -160,7 +160,7 @@ def round_to_local_hour(t: dt.datetime) -> dt.datetime:
         t = t + dt.timedelta(hours=1)
     return t.replace(minute=0, second=0, microsecond=0, tzinfo=TZ)
 
-# ----- Apply CHS offsets in LOCAL time (fixes UTC/local key mismatch) -----
+# ----- Apply CHS offsets in LOCAL time -----
 def apply_spot_tide_offsets(out_data: dict):
     """
     Use Beauport tide phase as baseline in LOCAL time and synthesize tide phase for
@@ -182,7 +182,7 @@ def apply_spot_tide_offsets(out_data: dict):
         # Ensure format matches Open-Meteo's "YYYY-MM-DDTHH:MM"
         if len(key) == 16:  # e.g., 2025-08-15T13:00
             return base_local.get(key, "unknown")
-        # Fallback: try constructing manually
+        # Fallback: construct manually
         key2 = f"{local_dt.year:04d}-{local_dt.month:02d}-{local_dt.day:02d}T{local_dt.hour:02d}:00"
         return base_local.get(key2, "unknown")
 
@@ -261,14 +261,34 @@ def main():
     else:
         print("[INFO] No suitable baseline from SPINE trials; tides will be 'unknown'", file=sys.stderr)
 
-    # 4) Build baseline (Beauport) tide trend per hour (keyed by UTC hour string)
+    # 4) Build baseline (Beauport) tide trend per hour: exact lookup first, then nearest fallback
     baseline_trend = {}
     if baseline_map:
+        # Precompute a sorted list for fallback nearest lookups
         times, vals = build_sorted_series(baseline_map)
-        for (a,b) in utc_pairs:
-            t0 = dt.datetime.fromisoformat(a.replace("Z","+00:00")).astimezone(dt.timezone.utc)
-            t1 = dt.datetime.fromisoformat(b.replace("Z","+00:00")).astimezone(dt.timezone.utc)
-            baseline_trend[a] = classify_trend_from_series(times, vals, t0, t1)
+
+        def classify_pair_exact_or_nearest(a_isoZ, b_isoZ):
+            # exact keys first
+            v0 = baseline_map.get(a_isoZ)
+            v1 = baseline_map.get(b_isoZ)
+
+            # fallback to nearest within MAX_T_MATCH_MIN if any is missing
+            if v0 is None or v1 is None:
+                t0 = dt.datetime.fromisoformat(a_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
+                t1 = dt.datetime.fromisoformat(b_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
+                v0 = v0 if v0 is not None else nearest_value(times, vals, t0, MAX_T_MATCH_MIN)
+                v1 = v1 if v1 is not None else nearest_value(times, vals, t1, MAX_T_MATCH_MIN)
+
+            if v0 is None or v1 is None:
+                return "unknown"
+
+            dv = v1 - v0
+            if dv > EPS_TIDE:  return "rising"
+            if dv < -EPS_TIDE: return "falling"
+            return "slack"
+
+        for (a_isoZ, b_isoZ) in utc_pairs:
+            baseline_trend[a_isoZ] = classify_pair_exact_or_nearest(a_isoZ, b_isoZ)
     else:
         print("[INFO] Baseline map empty; tides will be 'unknown'", file=sys.stderr)
 
@@ -332,6 +352,11 @@ def main():
         "note": "Non-Baseline tides are time-shifted from Beauport using local-time offsets.",
     }
     result["debug_counts"] = {k: count_trend(result["hours"], k) for k in SPOTS.keys()}
+    # How many baseline trend keys were filled vs unknown (useful for debugging)
+    result["baseline_trend_fill"] = {
+        "total_keys": len(utc_pairs),
+        "non_unknown": sum(1 for k,v in ({} if not locals().get("baseline_trend") else baseline_trend).items() if v != "unknown")
+    }
     result["wind_models"] = "Open-Meteo auto (no models= param)"
 
     with open("forecast.json", "w", encoding="utf-8") as f:

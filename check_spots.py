@@ -1,13 +1,8 @@
-# check_spots.py — gust-based rules + IWLS predictions using fixed CHS station IDs
-# Wind (gust/mean/dir): Open-Meteo (no key)
-# Tide: Canadian Hydrographic Service IWLS predictions (no key) for stations:
-#   - Vieux-Québec (03248) for Baie de Beauport
-#   - Sainte-Anne-de-Beaupré (03087) for Ste-Anne
-#   - Saint-Jean I.O. (03105) for St-Jean, Île d’Orléans
-#
-# "Go" uses gusts (kn). Tide trend computed from nearest predictions around each hour.
+# check_spots.py — gust-based rules + SPINE tide using channel-proxy coordinates (robust)
+# Wind: Open-Meteo (gust/mean/dir) — no key
+# Tide: DFO SPINE water-level forecast at nearby channel points — no key
 
-import json, datetime as dt, urllib.request, urllib.parse, sys, math
+import json, datetime as dt, urllib.request, urllib.parse, sys
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
@@ -15,20 +10,31 @@ NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
 HOURS = 96  # look ahead
 
 SPOTS = {
-    "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006, "iwls_id": "03248"},  # Vieux-Québec
-    "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280, "iwls_id": "03087"},
-    "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169, "iwls_id": "03105"},
+    "beauport": {
+        "name": "Baie de Beauport",
+        "lat": 46.8598, "lon": -71.2006,           # display/ wind point
+        "spine_lat": 46.8609, "spine_lon": -71.1835  # channel proxy
+    },
+    "ste_anne": {
+        "name": "Quai Ste-Anne-de-Beaupré",
+        "lat": 47.0153, "lon": -70.9280,
+        "spine_lat": 47.0088, "spine_lon": -70.9250
+    },
+    "st_jean": {
+        "name": "Quai St-Jean, Île d’Orléans",
+        "lat": 46.8577, "lon": -70.8169,
+        "spine_lat": 46.8740, "spine_lon": -70.8140
+    },
 }
 
-# Gust thresholds (kn)
+# Gust thresholds (kn) — you asked for 10 kn at all 3 spots
 THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
 
-# Direction sectors (deg, "from"):
+# Direction sectors (deg "from")
 DIR_SW = (200, 250)  # Ste-Anne
 DIR_NE = (30, 70)    # St-Jean
 
-def is_dir_in_sector(deg, lo, hi):
-    return (lo <= deg <= hi) if lo <= hi else (deg >= lo or deg <= hi)
+def is_dir_in_sector(deg, lo, hi): return (lo <= deg <= hi) if lo <= hi else (deg >= lo or deg <= hi)
 def in_SW(deg): return is_dir_in_sector(deg, *DIR_SW)
 def in_NE(deg): return is_dir_in_sector(deg, *DIR_NE)
 
@@ -36,7 +42,7 @@ def http_get_json(url, timeout=45):
     with urllib.request.urlopen(url, timeout=timeout) as r:
         return json.load(r)
 
-# ---------- WIND (Open-Meteo) ----------
+# -------- WIND (Open-Meteo) ----------
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
@@ -49,98 +55,34 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     })
     return http_get_json(f"{base}?{qs}")
 
-# ---------- TIDE (IWLS predictions, fixed station IDs) ----------
-IWLS_BASE = "https://api-iwls.dfo-mpo.gc.ca"
+# -------- TIDE (SPINE) ----------
+SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
 
-def iwls_predictions(station_id, begin_utc_iso, end_utc_iso):
-    """
-    Return dict[utc_iso] -> predicted level (m) for station_id between begin & end UTC.
-    Try a few known endpoint shapes for compatibility.
-    """
-    enc = urllib.parse.quote
-    candidates = [
-        f"{IWLS_BASE}/v3/stations/{station_id}/predictions?begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
-        f"{IWLS_BASE}/stations/{station_id}/predictions?begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
-        f"{IWLS_BASE}/v3/stations/{station_id}/data?datatype=predictions&begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
-    ]
-    for url in candidates:
-        try:
-            data = http_get_json(url)
-            out = {}
-            seqs = []
-            if isinstance(data, dict):
-                if "predictions" in data and isinstance(data["predictions"], list):
-                    seqs = data["predictions"]
-                elif "items" in data and isinstance(data["items"], list):
-                    seqs = data["items"]
-            if isinstance(data, list):
-                seqs = data
-            for it in seqs:
-                t = it.get("t") or it.get("time") or it.get("instant")
-                v = it.get("v") or it.get("value") or it.get("waterLevel")
-                if t is not None and v is not None:
-                    out[str(t)] = float(v)
-            if out:
-                return out
-        except Exception as e:
-            print(f"[WARN] IWLS predictions fetch failed for {station_id}: {e}", file=sys.stderr)
-    return {}
-
-def classify_trend_at_hour(pred_map, utc_hour_iso):
-    """
-    Given a dict of predictions (time->level) and an hour timestamp (UTC),
-    find the nearest prediction before and after that hour within ±3h and classify.
-    """
-    if not pred_map:
-        return "unknown"
+def spine_levels_for_hours(lat, lon, utc_list):
+    # Batch request: repeat lat, lon, t for all hours in list
+    q = []
+    for t in utc_list:
+        q += [("lat", f"{lat}"), ("lon", f"{lon}"), ("t", t)]
+    url = f"{SPINE_BASE}?{urllib.parse.urlencode(q)}"
     try:
-        t0 = dt.datetime.fromisoformat(utc_hour_iso.replace("Z","+00:00"))
+        data = http_get_json(url)
+        items = data.get("responseItems", [])
+        out = {it.get("instant"): it.get("waterLevel") for it in items if it.get("status") == "OK"}
+        return out
+    except Exception as e:
+        print(f"[WARN] SPINE fetch failed @({lat},{lon}): {e}", file=sys.stderr)
+        return {}
+
+def classify_trend(spine_map, t_utc_iso, t1_utc_iso):
+    v0 = spine_map.get(t_utc_iso)
+    v1 = spine_map.get(t1_utc_iso)
+    if v0 is None or v1 is None: return "unknown"
+    try:
+        dv = float(v1) - float(v0)
     except Exception:
         return "unknown"
-
-    # Build sorted list of (time, level)
-    items = []
-    for ts, val in pred_map.items():
-        try:
-            t = dt.datetime.fromisoformat(ts.replace("Z","+00:00"))
-            items.append((t, float(val)))
-        except Exception:
-            continue
-    if not items:
-        return "unknown"
-    items.sort(key=lambda x: x[0])
-
-    # Find neighbors around the hour
-    before = None
-    after = None
-    for (t, v) in items:
-        if t <= t0:
-            before = (t, v)
-        if t >= t0 and after is None:
-            after = (t, v)
-            break
-
-    # Expand window if both missing
-    def within_hrs(a, b, hrs): return abs((a-b).total_seconds()) <= hrs*3600
-
-    if before is None:
-        # take closest earlier within 3h
-        cand = [iv for iv in items if iv[0] < t0 and within_hrs(iv[0], t0, 3)]
-        if cand:
-            before = max(cand, key=lambda x: x[0])
-    if after is None:
-        cand = [iv for iv in items if iv[0] > t0 and within_hrs(iv[0], t0, 3)]
-        if cand:
-            after = min(cand, key=lambda x: x[0])
-
-    if not before or not after:
-        return "unknown"
-
-    vb, va = before[1], after[1]
-    if va > vb + 0.02:  # small epsilon to avoid jitter
-        return "rising"
-    if va < vb - 0.02:
-        return "falling"
+    if dv > 0.02: return "rising"
+    if dv < -0.02: return "falling"
     return "slack"
 
 def main():
@@ -148,52 +90,51 @@ def main():
     end_local = NOW + dt.timedelta(hours=HOURS)
     result = {"generated_at": NOW.isoformat(), "hours": []}
 
-    # WIND (all spots)
+    # 1) Wind for each spot
     wind = {}
     for key, spot in SPOTS.items():
         try:
-            wjson = fetch_open_meteo_wind(spot["lat"], spot["lon"], start_local, end_local)
+            wj = fetch_open_meteo_wind(spot["lat"], spot["lon"], start_local, end_local)
             wind[key] = {
-                "time": wjson["hourly"]["time"],                # local ISO
-                "avg":  wjson["hourly"]["windspeed_10m"],       # kn
-                "gust": wjson["hourly"]["windgusts_10m"],       # kn
-                "dir":  wjson["hourly"]["winddirection_10m"],   # deg
+                "time": wj["hourly"]["time"],                # local ISO strings
+                "avg":  wj["hourly"]["windspeed_10m"],       # kn
+                "gust": wj["hourly"]["windgusts_10m"],       # kn
+                "dir":  wj["hourly"]["winddirection_10m"],   # deg
             }
         except Exception as e:
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
             wind[key] = {"time": [], "avg": [], "gust": [], "dir": []}
 
-    # Master timeline = Beauport wind times
-    timeline_local = wind["beauport"]["time"]
+    # 2) Master timeline = Beauport wind times (ensures we always render)
+    timeline_local = wind.get("beauport", {}).get("time", [])
     if not timeline_local:
         with open("forecast.json", "w", encoding="utf-8") as f:
             json.dump({"generated_at": NOW.isoformat(), "hours": []}, f, ensure_ascii=False, indent=2)
         return
 
-    # Build per-spot IWLS prediction maps once
-    tide_pred_maps = {}
-    begin_utc = dt.datetime.fromisoformat(timeline_local[0]).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
-    end_utc   = dt.datetime.fromisoformat(timeline_local[-1]).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
-    begin_iso = begin_utc.isoformat().replace("+00:00","Z")
-    end_iso   = end_utc.isoformat().replace("+00:00","Z")
+    # Build paired UTC times [t, t+1h] for SPINE
+    utc_pairs = []
+    for tloc in timeline_local:
+        t0 = dt.datetime.fromisoformat(tloc).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
+        t1 = t0 + dt.timedelta(hours=1)
+        utc_pairs.append( (t0.isoformat().replace("+00:00","Z"), t1.isoformat().replace("+00:00","Z")) )
 
+    # 3) Fetch SPINE for each spot at the proxy channel location
+    spine_maps = {}
+    # We’ll request all t and all t+1h in a single batch per spot
     for key, spot in SPOTS.items():
-        stid = spot["iwls_id"]
-        m = {}
-        try:
-            m = iwls_predictions(stid, begin_iso, end_iso)
-            if not m:
-                print(f"[INFO] IWLS returned empty predictions for station {stid} ({spot['name']})", file=sys.stderr)
-            else:
-                print(f"[INFO] IWLS predictions loaded for station {stid} ({spot['name']})", file=sys.stderr)
-        except Exception as e:
-            print(f"[WARN] IWLS retrieval failed for station {stid}: {e}", file=sys.stderr)
-        tide_pred_maps[key] = m
+        t_list = []
+        for a,b in utc_pairs:
+            t_list.append(a); t_list.append(b)
+        m = spine_levels_for_hours(spot["spine_lat"], spot["spine_lon"], t_list)
+        if not m:
+            print(f"[INFO] SPINE returned empty map near {spot['name']} (proxy {spot['spine_lat']},{spot['spine_lon']})", file=sys.stderr)
+        spine_maps[key] = m
 
-    # Compose hourly rows
-    for t_loc_iso in timeline_local:
+    # 4) Compose rows
+    for i, t_loc_iso in enumerate(timeline_local):
         row = {"time": t_loc_iso}
-        utc_iso = dt.datetime.fromisoformat(t_loc_iso).replace(tzinfo=TZ).astimezone(dt.timezone.utc).isoformat().replace("+00:00","Z")
+        t0_utc, t1_utc = utc_pairs[i]
 
         for key, spot in SPOTS.items():
             gust = avg = d = None
@@ -206,10 +147,9 @@ def main():
             except Exception:
                 pass
 
-            # Classify tide trend using nearest predictions (graceful)
-            tide_status = classify_trend_at_hour(tide_pred_maps.get(key, {}), utc_iso)
+            tide_status = classify_trend(spine_maps.get(key, {}), t0_utc, t1_utc)
 
-            # Evaluate rules on gust
+            # Evaluate rules (gust-based)
             thr = THRESHOLD_GUST[key]
             if key == "beauport":
                 go_flag = (gust is not None and gust >= thr)
@@ -221,8 +161,8 @@ def main():
                 go_flag = False
 
             row[key] = {
-                "wind_kn": round(gust, 1) if gust is not None else None,       # gusts
-                "wind_avg_kn": round(avg, 1) if avg is not None else None,     # mean
+                "wind_kn": round(gust, 1) if gust is not None else None,
+                "wind_avg_kn": round(avg, 1) if avg is not None else None,
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {

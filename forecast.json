@@ -403,7 +403,7 @@
         "wind_kn": 8.0,
         "wind_avg_kn": 6.9,
         "dir_deg": 65,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -414,7 +414,7 @@
         "wind_kn": 7.2,
         "wind_avg_kn": 6.2,
         "dir_deg": 58,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -425,7 +425,7 @@
         "wind_kn": 6.0,
         "wind_avg_kn": 5.1,
         "dir_deg": 25,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -4325,6 +4325,27 @@
   "tide_baseline": {
     "lat": 46.8609,
     "lon": -71.1835,
-    "note": "Tide for Ste-Anne & St-Jean is time-shifted from the baseline using TIDE_OFFSETS_MIN."
+    "max_match_minutes": 75,
+    "note": "Ste-Anne & St-Jean tides are time-shifted from baseline using TIDE_OFFSETS_MIN."
+  },
+  "debug_counts": {
+    "beauport": {
+      "unknown": 11,
+      "slack": 1,
+      "falling": 65,
+      "rising": 43
+    },
+    "ste_anne": {
+      "unknown": 11,
+      "slack": 1,
+      "falling": 65,
+      "rising": 43
+    },
+    "st_jean": {
+      "unknown": 11,
+      "slack": 1,
+      "falling": 65,
+      "rising": 43
+    }
   }
 }

@@ -51,9 +51,6 @@
   .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
-
-  /* separator rows when baseline flips Rising↔Falling (per day) */
-  tr.sep > th, tr.sep > td { border-top:3px solid #999 !important; }
 </style>
 
 <header>
@@ -91,7 +88,8 @@
   <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥10 kn gust.
   Arrow points <b>from</b> the wind’s source (based on mean wind direction).
   The thin colored stripe next to each day shows the <b>baseline (Beauport)</b> tide phase at that hour:
-  <span class="swatch s-rise"></span> Rising, <span class="swatch s-fall"></span> Falling (grey = slack, transparent = unknown).
+  <span class="swatch s-rise"></span> Rising, <span class="swatch s-fall"></span> Falling
+  (grey = slack, transparent = unknown).
 </p>
 
 <script>
@@ -161,13 +159,6 @@
       baselineTide[k][h] = tide;
     }
   });
-
-  // For separators: track flips per day
-  function isFlip(a,b){
-    const A = a && a.toLowerCase();
-    const B = b && b.toLowerCase();
-    return (A==='rising' && B==='falling') || (A==='falling' && B==='rising');
-  }
 
   function tideStripeColor(state){
     const s = (state||'').toLowerCase();
@@ -239,10 +230,6 @@
 
     const tbody = document.createElement('tbody');
 
-    // Track previous baseline per day to place separators on flips within each day
-    const prevByDay = {};
-    dayOrder.forEach(k=> prevByDay[k] = null);
-
     for(let hour=HSTART; hour<=HEND; hour++){
       const hrStr = hour.toString().padStart(2,'0');
       const tr = document.createElement('tr');
@@ -256,13 +243,6 @@
       // For each day: tide stripe + data cell
       dayOrder.forEach(dk=>{
         const tideState = baselineTide[dk] ? (baselineTide[dk][hrStr] || 'unknown') : 'unknown';
-
-        // separator if this day flips Rising<->Falling from previous row
-        const prev = prevByDay[dk];
-        if (prev !== null && isFlip(prev, tideState)){
-          tr.classList.add('sep'); // thick line across the whole table row
-        }
-        prevByDay[dk] = tideState;
 
         // tide stripe cell (very narrow)
         const tdStripe = document.createElement('td');

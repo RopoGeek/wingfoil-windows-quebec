@@ -874,7 +874,7 @@
         "wind_kn": 5.6,
         "wind_avg_kn": 5.1,
         "dir_deg": 99,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -886,7 +886,7 @@
         "wind_kn": 5.2,
         "wind_avg_kn": 5.0,
         "dir_deg": 69,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -898,7 +898,7 @@
         "wind_kn": 1.4,
         "wind_avg_kn": 1.2,
         "dir_deg": 18,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -910,7 +910,7 @@
         "wind_kn": 3.9,
         "wind_avg_kn": 2.7,
         "dir_deg": 94,
-        "tide": "unknown",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -6125,34 +6125,38 @@
   "tide_baseline": {
     "lat": 46.8609,
     "lon": -71.1835,
-    "max_match_minutes": 75,
+    "max_match_minutes": 150,
     "note": "Non-Baseline tides are time-shifted from Beauport using local-time offsets."
   },
   "debug_counts": {
     "beauport": {
-      "unknown": 18,
-      "slack": 2,
+      "unknown": 17,
+      "slack": 3,
       "rising": 42,
       "falling": 58
     },
     "ste_anne": {
-      "unknown": 18,
-      "slack": 2,
+      "unknown": 17,
+      "slack": 3,
       "rising": 42,
       "falling": 58
     },
     "st_jean": {
-      "unknown": 18,
-      "slack": 2,
+      "unknown": 17,
+      "slack": 3,
       "rising": 42,
       "falling": 58
     },
     "ange_gardien": {
-      "unknown": 18,
-      "slack": 2,
+      "unknown": 17,
+      "slack": 3,
       "rising": 42,
       "falling": 58
     }
+  },
+  "baseline_trend_fill": {
+    "total_keys": 120,
+    "non_unknown": 103
   },
   "wind_models": "Open-Meteo auto (no models= param)"
 }

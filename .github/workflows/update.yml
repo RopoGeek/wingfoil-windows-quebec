@@ -1,25 +1,28 @@
 name: Update forecast
 
 on:
+  workflow_dispatch:       # allow manual run
   schedule:
-    - cron: '0 */3 * * *'   # every 3 hours
-  workflow_dispatch:
+    - cron: '0,30 * * * *'    # run at the top of every hour (UTC)
 
 permissions:
-  contents: write
+  contents: write          # needed to push forecast.json
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+
+      - name: Show Python version
+        run: python3 --version
 
       - name: Generate forecast.json
         run: python3 check_spots.py
@@ -27,7 +30,7 @@ jobs:
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Update forecast.json [skip ci]" || echo "No changes"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add forecast.json
+          git commit -m "Update forecast.json [skip ci]" || echo "No changes to commit"
           git push

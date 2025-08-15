@@ -1,7 +1,7 @@
-# check_spots.py — Wind + Tides (Open-Meteo + DFO SPINE) with CHS-style offsets
+# check_spots.py — Wind + Tides (Open-Meteo + DFO SPINE) with local-time CHS offsets
 # - Wind: Open-Meteo (auto model selection for Québec)
 # - Tides: SPINE baseline near Baie de Beauport; other spots = time-shifted estimates
-# - “Go” rules use gusts >= 10 kn + spot-specific direction + tide
+# - Rules: gusts >= 10 kn + spot-specific direction + tide
 # - Output: forecast.json consumed by index.html
 
 import json, datetime as dt, urllib.request, urllib.parse, sys, time, bisect
@@ -17,7 +17,7 @@ SPOTS = {
     "beauport":     {"name": "Baie de Beauport",             "lat": 46.8598,    "lon": -71.2006},
     "ste_anne":     {"name": "Quai Ste-Anne-de-Beaupré",     "lat": 47.0153,    "lon": -70.9280},
     "st_jean":      {"name": "Quai St-Jean, Île d’Orléans",  "lat": 46.8577,    "lon": -70.8169},
-    "ange_gardien": {"name": "Ange-Gardien",                  "lat": 46.907944,  "lon": -71.090028},  # 46°54'28.6"N 71°05'24.1"W
+    "ange_gardien": {"name": "Ange-Gardien",                  "lat": 46.907944,  "lon": -71.090028},
 }
 
 # Gust thresholds (kn)
@@ -33,7 +33,7 @@ def in_NE(deg): return _in_sector(deg, *DIR_NE)
 # SPINE water level API (DFO)
 SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
 
-# Candidate points around Beauport (we’ll pick the one that returns the most data)
+# Candidate points around Beauport (pick the one returning most data)
 BASELINE_CANDIDATES = [
     (46.8609, -71.1835),
     (46.8420, -71.2100),
@@ -49,7 +49,7 @@ MAX_T_MATCH_MIN = 75      # tolerate ±75 min difference for matching SPINE inst
 TIDE_PHASE_OFFSETS = {
     "ste_anne":     {"rising": 23, "falling": 10},
     "st_jean":      {"rising": 17, "falling":  8},
-    "ange_gardien": {"rising": 23, "falling": 10},  # same as Ste-Anne (proximity & similar exposure)
+    "ange_gardien": {"rising": 23, "falling": 10},  # same as Ste-Anne
 }
 
 # ----- HTTP helper -----
@@ -145,53 +145,61 @@ def classify_trend_from_series(times, vals, t0_utc, t1_utc, eps=EPS_TIDE):
     if dv < -eps: return "falling"
     return "slack"
 
-# ----- Tide offsets based on Beauport baseline -----
-def _from_any_iso(s: str) -> dt.datetime | None:
+# ----- Helpers for local-time handling -----
+def parse_local_iso(s: str) -> dt.datetime | None:
+    # Open-Meteo returns "YYYY-MM-DDTHH:00" in the requested timezone (no offset).
     try:
-        return dt.datetime.fromisoformat(s.replace("Z","+00:00"))
+        # Attach TZ to interpret as local time
+        return dt.datetime.fromisoformat(s).replace(tzinfo=TZ)
     except Exception:
         return None
 
-def _nearest_hour_utc(t: dt.datetime) -> dt.datetime:
-    t = t.astimezone(dt.timezone.utc)
+def round_to_local_hour(t: dt.datetime) -> dt.datetime:
+    # round to nearest hour in local time
     if t.minute >= 30:
         t = t + dt.timedelta(hours=1)
-    return t.replace(minute=0, second=0, microsecond=0, tzinfo=dt.timezone.utc)
+    return t.replace(minute=0, second=0, microsecond=0, tzinfo=TZ)
 
+# ----- Apply CHS offsets in LOCAL time (fixes UTC/local key mismatch) -----
 def apply_spot_tide_offsets(out_data: dict):
     """
-    Use Beauport tide phase as baseline and synthesize tide phase for
-    other spots by applying CHS-style time offsets (minutes).
+    Use Beauport tide phase as baseline in LOCAL time and synthesize tide phase for
+    Sainte-Anne, St-Jean, Ange-Gardien by applying CHS-style time offsets (minutes).
     """
     hours = out_data.get("hours", [])
     if not hours: return
 
-    # rounded-UTC-hour -> Beauport tide phase
-    base = {}
+    # Build local-time map: 'YYYY-MM-DDTHH:00' (as emitted in row['time']) -> Beauport tide
+    base_local = {}
     for row in hours:
-        t_local = _from_any_iso(row.get("time",""))
-        if not t_local: continue
-        key = _nearest_hour_utc(t_local).isoformat().replace("+00:00","Z")
-        base[key] = (row.get("beauport") or {}).get("tide", "unknown")
+        t_str = row.get("time")
+        if not t_str: continue
+        tide = (row.get("beauport") or {}).get("tide", "unknown")
+        base_local[t_str] = tide
 
-    def probe(utc_dt: dt.datetime) -> str:
-        k = _nearest_hour_utc(utc_dt).isoformat().replace("+00:00","Z")
-        return base.get(k, "unknown")
+    def probe_local(local_dt: dt.datetime) -> str:
+        key = round_to_local_hour(local_dt).replace(tzinfo=None).isoformat(timespec="minutes")
+        # Ensure format matches Open-Meteo's "YYYY-MM-DDTHH:MM"
+        if len(key) == 16:  # e.g., 2025-08-15T13:00
+            return base_local.get(key, "unknown")
+        # Fallback: try constructing manually
+        key2 = f"{local_dt.year:04d}-{local_dt.month:02d}-{local_dt.day:02d}T{local_dt.hour:02d}:00"
+        return base_local.get(key2, "unknown")
 
-    def shifted_state(t_local: dt.datetime, off_rise: int, off_fall: int) -> str:
-        tr = probe(t_local.astimezone(dt.timezone.utc) - dt.timedelta(minutes=off_rise))
-        tf = probe(t_local.astimezone(dt.timezone.utc) - dt.timedelta(minutes=off_fall))
+    def shifted_state_local(t_local: dt.datetime, off_rise_min: int, off_fall_min: int) -> str:
+        tr = probe_local(t_local - dt.timedelta(minutes=off_rise_min))
+        tf = probe_local(t_local - dt.timedelta(minutes=off_fall_min))
         if tr == "rising":  return "rising"
         if tf == "falling": return "falling"
         if "slack" in (tr, tf): return "slack"
         return tr if tr != "unknown" else tf
 
     for row in hours:
-        t_local = _from_any_iso(row.get("time",""))
+        t_local = parse_local_iso(row.get("time",""))
         if not t_local: continue
         for spot_key, offs in TIDE_PHASE_OFFSETS.items():
             spot = (row.get(spot_key) or {})
-            spot["tide"] = shifted_state(t_local, offs["rising"], offs["falling"])
+            spot["tide"] = shifted_state_local(t_local, offs["rising"], offs["falling"])
             row[spot_key] = spot
 
 # ----- MAIN -----
@@ -206,7 +214,7 @@ def main():
         try:
             wj = fetch_open_meteo_wind(spot["lat"], spot["lon"], start_local, end_local)
             wind[key] = {
-                "time": wj["hourly"]["time"],                # local ISO
+                "time": wj["hourly"]["time"],                # local ISO (no tz offset)
                 "avg":  wj["hourly"]["windspeed_10m"],       # kn
                 "gust": wj["hourly"]["windgusts_10m"],       # kn
                 "dir":  wj["hourly"]["winddirection_10m"],   # deg
@@ -222,10 +230,10 @@ def main():
             json.dump(result, f, ensure_ascii=False, indent=2)
         return
 
-    # Build UTC hour instants and hour pairs for tide classification
+    # Build UTC hour instants and hour pairs for tide classification (SPINE is UTC)
     utc_hours, utc_pairs = [], []
     for tloc in timeline_local:
-        t0 = dt.datetime.fromisoformat(tloc).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
+        t0 = parse_local_iso(tloc).astimezone(dt.timezone.utc)
         a  = t0.isoformat().replace("+00:00","Z")
         b  = (t0 + dt.timedelta(hours=1)).isoformat().replace("+00:00","Z")
         utc_hours.append(a)
@@ -253,7 +261,7 @@ def main():
     else:
         print("[INFO] No suitable baseline from SPINE trials; tides will be 'unknown'", file=sys.stderr)
 
-    # 4) Build baseline (Beauport) tide trend per hour
+    # 4) Build baseline (Beauport) tide trend per hour (keyed by UTC hour string)
     baseline_trend = {}
     if baseline_map:
         times, vals = build_sorted_series(baseline_map)
@@ -264,7 +272,7 @@ def main():
     else:
         print("[INFO] Baseline map empty; tides will be 'unknown'", file=sys.stderr)
 
-    # 5) Compose hour rows
+    # 5) Compose hour rows (fill Beauport tide here)
     for i, t_loc_iso in enumerate(timeline_local):
         row = {"time": t_loc_iso}
         utc_iso = utc_hours[i]
@@ -311,7 +319,7 @@ def main():
 
         result["hours"].append(row)
 
-    # 6) Apply CHS-style time offsets to synthesize tides for non-baseline spots
+    # 6) Apply CHS-style time offsets in LOCAL time to synthesize tides for the other spots
     apply_spot_tide_offsets(result)
 
     # 7) Debug + metadata
@@ -321,7 +329,7 @@ def main():
         "lat": (baseline_latlon[0] if baseline_latlon else None),
         "lon": (baseline_latlon[1] if baseline_latlon else None),
         "max_match_minutes": MAX_T_MATCH_MIN,
-        "note": "Non-Baseline tides are time-shifted estimates from Beauport using TIDE_PHASE_OFFSETS."
+        "note": "Non-Baseline tides are time-shifted from Beauport using local-time offsets.",
     }
     result["debug_counts"] = {k: count_trend(result["hours"], k) for k in SPOTS.keys()}
     result["wind_models"] = "Open-Meteo auto (no models= param)"

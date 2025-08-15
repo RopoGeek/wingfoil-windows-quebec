@@ -1,6 +1,6 @@
 # check_spots.py — Wind + Tides (Open-Meteo + DFO SPINE) with CHS-style offsets
-# - Wind: Open-Meteo (no models= param; lets OM choose best for Québec)
-# - Tides: SPINE baseline near Baie de Beauport; Sainte-Anne & St-Jean get time-shifted estimates
+# - Wind: Open-Meteo (auto model selection for Québec)
+# - Tides: SPINE baseline near Baie de Beauport; Sainte-Anne & St-Jean = time-shifted estimates
 # - “Go” rules use gusts >= 10 kn + spot-specific direction + tide
 # - Output: forecast.json consumed by index.html
 
@@ -29,17 +29,20 @@ def _in_sector(deg, lo, hi): return (lo <= deg <= hi) if lo <= hi else (deg >= l
 def in_SW(deg): return _in_sector(deg, *DIR_SW)
 def in_NE(deg): return _in_sector(deg, *DIR_NE)
 
-# SPINE water level API (Environment & Climate Change Canada / DFO)
+# SPINE water level API (DFO)
 SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
-# Candidate points around Beauport (auto-pick one that returns data)
+
+# Candidate points around Beauport (we’ll pick the one that returns the most data)
 BASELINE_CANDIDATES = [
-    (46.8609, -71.1835),
+    (46.8609, -71.1835),  # this one worked in your earlier logs
     (46.8420, -71.2100),
     (46.8750, -71.1600),
     (46.8350, -71.2450),
 ]
+
+# Tide classification tuning
 EPS_TIDE = 0.02           # meters; delta to call rising/falling vs slack
-MAX_T_MATCH_MIN = 75      # tolerate ±75 min difference in SPINE instants
+MAX_T_MATCH_MIN = 75      # tolerate ±75 min difference for matching SPINE instants
 
 # CHS-style phase offsets (minutes): rising uses LLW offset; falling uses HHW offset
 TIDE_PHASE_OFFSETS = {
@@ -55,9 +58,8 @@ def http_get_json(url, timeout=45):
 # ----- Wind (Open-Meteo) -----
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     """
-    Uses the generic Open-Meteo /v1/forecast endpoint WITHOUT a models= parameter.
-    OM will pick the best available model(s) for the coordinates and timerange.
-    Returns hourly windspeed (avg), windgusts, and winddirection at 10m, in knots.
+    Uses Open-Meteo /v1/forecast WITHOUT a models= parameter.
+    OM will pick the best available model(s) for the coordinates & window.
     """
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
@@ -214,7 +216,6 @@ def main():
     # 2) Master timeline = Beauport wind hours
     timeline_local = wind.get("beauport", {}).get("time", [])
     if not timeline_local:
-        # If we cannot fetch wind, still emit an empty structure to avoid crashes
         with open("forecast.json", "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         return
@@ -228,20 +229,27 @@ def main():
         utc_hours.append(a)
         utc_pairs.append((a,b))
 
-    # 3) Select a SPINE baseline point that returns enough data, then fetch full horizon
+    # 3) Pick the BEST SPINE proxy by trial coverage, then fetch full horizon
     flat_times = [ts for p in utc_pairs for ts in p]
-    baseline_map = {}
-    baseline_latlon = None
     trial = flat_times[:48] if len(flat_times) >= 48 else flat_times
+
+    best = None  # (ok_count, (lat,lon), test_map)
     for (plat, plon) in BASELINE_CANDIDATES:
         test_map = spine_levels_batch(plat, plon, trial, chunk_size=24)
         ok_test  = sum(1 for ts in trial if ts in test_map)
         print(f"[INFO] Baseline test @({plat},{plon}): {ok_test} OK trial points", file=sys.stderr)
-        if ok_test >= max(8, len(trial)//3):
-            print(f"[INFO] Baseline SELECTED @({plat},{plon}) — fetching full horizon", file=sys.stderr)
-            baseline_map = spine_levels_batch(plat, plon, flat_times, chunk_size=36)
-            baseline_latlon = (plat, plon)
-            break
+        if best is None or ok_test > best[0]:
+            best = (ok_test, (plat, plon), test_map)
+
+    baseline_map = {}
+    baseline_latlon = None
+    if best and best[0] >= max(6, len(trial)//6):  # relaxed: ~≥16% of trial or at least 6 instants
+        plat, plon = best[1]
+        print(f"[INFO] Baseline SELECTED @({plat},{plon}) — fetching full horizon", file=sys.stderr)
+        baseline_map = spine_levels_batch(plat, plon, flat_times, chunk_size=36)
+        baseline_latlon = (plat, plon)
+    else:
+        print("[INFO] No suitable baseline from SPINE trials; tides will be 'unknown'", file=sys.stderr)
 
     # 4) Build baseline (Beauport) tide trend per hour
     baseline_trend = {}
@@ -252,7 +260,7 @@ def main():
             t1 = dt.datetime.fromisoformat(b.replace("Z","+00:00")).astimezone(dt.timezone.utc)
             baseline_trend[a] = classify_trend_from_series(times, vals, t0, t1)
     else:
-        print("[INFO] No baseline tide map selected; tides will be 'unknown'", file=sys.stderr)
+        print("[INFO] Baseline map empty; tides will be 'unknown'", file=sys.stderr)
 
     # 5) Compose hour rows
     for i, t_loc_iso in enumerate(timeline_local):
@@ -269,7 +277,6 @@ def main():
             except Exception:
                 pass
 
-            # tide from baseline only for Beauport here; we’ll synthesize others later
             tide_status = "unknown"
             if baseline_trend and key == "beauport":
                 tide_status = baseline_trend.get(utc_iso, "unknown")
@@ -286,8 +293,8 @@ def main():
                 go_flag = False
 
             row[key] = {
-                "wind_kn": round(gust, 1) if gust is not None else None,       # gusts
-                "wind_avg_kn": round(avg, 1) if avg is not None else None,     # mean wind
+                "wind_kn": round(gust, 1) if gust is not None else None,
+                "wind_avg_kn": round(avg, 1) if avg is not None else None,
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {
@@ -302,7 +309,7 @@ def main():
     # 6) Apply CHS-style time offsets to synthesize tides for Ste-Anne & St-Jean
     apply_spot_tide_offsets(result)
 
-    # 7) Debug + metadata (handy in forecast.json)
+    # 7) Debug + metadata
     def count_trend(rows, key):
         return dict(Counter(r.get(key, {}).get("tide", "unknown") for r in rows))
     result["tide_baseline"] = {

@@ -12,10 +12,10 @@
     --text:#222;
     --muted:#666;
 
-    --tide-rise:#0a6;   /* dark green text bg for Rising */
-    --tide-fall:#b00;   /* dark red text bg for Falling */
-    --tide-slack:#888;  /* grey for Slack */
-    --tide-unk:#aaa;    /* muted for Unknown */
+    --tide-rise:#0a6;   /* dark green for Rising */
+    --tide-fall:#b00;   /* dark red for Falling */
+    --tide-slack:#bbb;  /* light grey for Slack */
+    --tide-unk:transparent;
   }
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
   header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -33,32 +33,26 @@
   .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px;flex-wrap:wrap}
   .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
   .s-ok{background:var(--ok)} .s-no{background:var(--no)} .s-unk{background:var(--neutral)}
-  .s-sep{width:30px;height:0;border-top:3px solid #999;margin-left:4px;margin-right:2px}
+  .s-rise{background:var(--tide-rise)} .s-fall{background:var(--tide-fall)}
 
   /* Matrix */
   .matrix-wrap{overflow-x:auto;border:1px solid var(--grid-border);border-radius:10px}
   table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
   th,td{border-right:1px solid var(--grid-border);border-bottom:1px solid var(--grid-border)}
   th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:12px}
-  th.day{min-width:80px;text-align:center}
   th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:44px}
-  th.tidecol{position:sticky;left:44px;background:#fafafa;font-weight:500;width:64px}
-  td{height:18px;width:56px;padding:0}  /* narrow columns */
+  th.day{min-width:80px;text-align:center}
+  /* tiny tide stripe column placed before each day */
+  th.tideStripeHead{width:6px;padding:0;background:#fafafa}
+  td.tideStripe{width:6px;padding:0}
+  td{height:18px;width:56px;padding:0}  /* data columns */
   .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
-  /* tide chips */
-  .tide-chip{
-    font-size:11px; line-height:1; padding:2px 6px; border-radius:6px; color:#fff; display:inline-block;
-    min-width:56px; text-align:center;
-  }
-  .tide-rise{ background:var(--tide-rise); }
-  .tide-fall{ background:var(--tide-fall); }
-  .tide-slack{ background:#eee; color:#333; border:1px solid #ccc; }
-  .tide-unk{ background:#f2f2f2; color:#888; border:1px solid #ddd; }
-  /* separator rows when Rising↔Falling flips on baseline */
+
+  /* separator rows when baseline flips Rising↔Falling (per day) */
   tr.sep > th, tr.sep > td { border-top:3px solid #999 !important; }
 </style>
 
@@ -84,7 +78,8 @@
   <span class="swatch s-ok"></span> Go (gust meets rule) &nbsp;
   <span class="swatch s-no"></span> Not meeting rules &nbsp;
   <span class="swatch s-unk"></span> Missing data &nbsp; | &nbsp;
-  <span class="s-sep"></span> Rising ↔ Falling boundary (baseline)
+  <span class="swatch s-rise"></span> Rising tide stripe &nbsp;
+  <span class="swatch s-fall"></span> Falling tide stripe
 </div>
 
 <div id="matrices"></div>
@@ -95,6 +90,8 @@
   <b>Ste-Anne-de-Beaupré</b> SW 200–250° & rising tide & ≥10 kn gust;
   <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥10 kn gust.
   Arrow points <b>from</b> the wind’s source (based on mean wind direction).
+  The thin colored stripe next to each day shows the <b>baseline (Beauport)</b> tide phase at that hour:
+  <span class="swatch s-rise"></span> Rising, <span class="swatch s-fall"></span> Falling (grey = slack, transparent = unknown).
 </p>
 
 <script>
@@ -141,7 +138,7 @@
   }
 
   // Group ALL rows by day for quick access
-  const byDayAll = new Map(); // day -> array of rows (full objects with all 3 spots)
+  const byDayAll = new Map(); // day -> array of full rows
   for(const row of hours){
     const t = toLocal(row.time);
     const k = dayKey(t);
@@ -153,8 +150,8 @@
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
-  // Build a quick lookup map for baseline (Beauport) tide per day/hour
-  const baselineTide = {}; // { dayKey: { "06": "rising", ... } }
+  // Baseline (Beauport) tide per day/hour
+  const baselineTide = {}; // { dayKey: { "06": "rising" | "falling" | "slack" | "unknown" } }
   dayOrder.forEach(k=>{
     baselineTide[k] = {};
     const arr = byDayAll.get(k) || [];
@@ -164,6 +161,21 @@
       baselineTide[k][h] = tide;
     }
   });
+
+  // For separators: track flips per day
+  function isFlip(a,b){
+    const A = a && a.toLowerCase();
+    const B = b && b.toLowerCase();
+    return (A==='rising' && B==='falling') || (A==='falling' && B==='rising');
+  }
+
+  function tideStripeColor(state){
+    const s = (state||'').toLowerCase();
+    if (s==='rising')  return 'var(--tide-rise)';
+    if (s==='falling') return 'var(--tide-fall)';
+    if (s==='slack')   return 'var(--tide-slack)';
+    return 'var(--tide-unk)'; // unknown -> transparent
+  }
 
   const spots = [
     {key:'beauport', label:'Baie de Beauport'},
@@ -183,14 +195,6 @@
     tabBar.appendChild(tab);
   });
 
-  function tideChipHTML(state){
-    const s = (state||'unknown').toLowerCase();
-    if (s==='rising')  return `<span class="tide-chip tide-rise">Rising</span>`;
-    if (s==='falling') return `<span class="tide-chip tide-fall">Falling</span>`;
-    if (s==='slack')   return `<span class="tide-chip tide-slack">Slack</span>`;
-    return `<span class="tide-chip tide-unk">Unknown</span>`;
-  }
-
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = HOUR_RANGE[mode];
 
@@ -207,12 +211,12 @@
     corner.textContent = 'Hour';
     htr.appendChild(corner);
 
-    const hTide = document.createElement('th');
-    hTide.className = 'tidecol';
-    hTide.textContent = 'Tide';
-    htr.appendChild(hTide);
-
+    // For each day: add a tiny tide stripe header cell + the day header
     dayOrder.forEach(dk=>{
+      const thStripe = document.createElement('th');
+      thStripe.className = 'tideStripeHead';
+      htr.appendChild(thStripe);
+
       const th = document.createElement('th');
       th.className = 'day';
       const dt = new Date(dk + 'T00:00:00-04:00');
@@ -234,7 +238,10 @@
     });
 
     const tbody = document.createElement('tbody');
-    let prevBaseline = null;
+
+    // Track previous baseline per day to place separators on flips within each day
+    const prevByDay = {};
+    dayOrder.forEach(k=> prevByDay[k] = null);
 
     for(let hour=HSTART; hour<=HEND; hour++){
       const hrStr = hour.toString().padStart(2,'0');
@@ -246,27 +253,24 @@
       th.innerHTML = `<span class="hour-label">${hrStr}</span>`;
       tr.appendChild(th);
 
-      // Tide column (baseline = Beauport)
-      // Use the FIRST day’s baseline for the separator check; for display we show "--" if mixed across days.
-      // But for quick grasp, we show the baseline of the FIRST day column.
-      let firstDayTide = baselineTide[dayOrder[0]] ? (baselineTide[dayOrder[0]][hrStr] || 'unknown') : 'unknown';
-      const tdTide = document.createElement('th');
-      tdTide.className = 'tidecol';
-      tdTide.innerHTML = tideChipHTML(firstDayTide);
-      tr.appendChild(tdTide);
-
-      // Separator logic: add thick line when baseline flips Rising↔Falling from previous hour
-      const flip = (a,b) => {
-        const A=a&&a.toLowerCase(), B=b&&b.toLowerCase();
-        return (A==='rising' && B==='falling') || (A==='falling' && B==='rising');
-      };
-      if (prevBaseline!==null && flip(prevBaseline, firstDayTide)){
-        tr.classList.add('sep');
-      }
-      prevBaseline = firstDayTide;
-
-      // Data cells
+      // For each day: tide stripe + data cell
       dayOrder.forEach(dk=>{
+        const tideState = baselineTide[dk] ? (baselineTide[dk][hrStr] || 'unknown') : 'unknown';
+
+        // separator if this day flips Rising<->Falling from previous row
+        const prev = prevByDay[dk];
+        if (prev !== null && isFlip(prev, tideState)){
+          tr.classList.add('sep'); // thick line across the whole table row
+        }
+        prevByDay[dk] = tideState;
+
+        // tide stripe cell (very narrow)
+        const tdStripe = document.createElement('td');
+        tdStripe.className = 'tideStripe';
+        tdStripe.style.background = tideStripeColor(tideState);
+        tr.appendChild(tdStripe);
+
+        // spot data cell
         const obj = (map[dk] && map[dk][hrStr]) ? map[dk][hrStr] : {};
         const go = obj.go ? (obj.go.beauport ?? obj.go.ste_anne ?? obj.go.st_jean) : false;
 

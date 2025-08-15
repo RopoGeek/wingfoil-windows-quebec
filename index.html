@@ -10,14 +10,11 @@
     --blank:#ffffff;        /* criteria not met (blank) */
 
     /* strength scale (gust, when criteria are met) */
-    /* Greens: 10–18 kn */
-    --g1:#e9f9e4;  /* ~10–14 */
-    --g2:#b7f3af;  /* ~14–18 */
-    /* Yellows: 18–25 kn */
-    --y1:#fff3b0;  /* ~18–21 */
-    --y2:#ffd36e;  /* ~21–25 */
-    /* Reds: 25+ kn */
-    --r1:#ffb3a8;  /* ~25–30 */
+    --g1:#e9f9e4;  /* 10–14 kn */
+    --g2:#b7f3af;  /* 14–18 kn */
+    --y1:#fff3b0;  /* 18–21 kn */
+    --y2:#ffd36e;  /* 21–25 kn */
+    --r1:#ffb3a8;  /* 25–30 kn */
     --r2:#ff8a80;  /* 30+   */
 
     /* chrome */
@@ -48,30 +45,16 @@
     border-radius: 10px;
     padding: 12px 14px;
   }
-  .rules-block h2 {
-    font-size: 18px;
-    margin: 0 0 8px;
-  }
-  .rules-cols{
-    display:grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  @media (min-width: 720px){
-    .rules-cols{ grid-template-columns: 1fr 1fr; }
-  }
-  .rules-block ul {
-    margin: 0 0 6px 20px;
-    padding: 0;
-  }
+  .rules-block h2 { font-size: 18px; margin: 0 0 8px; }
+  .rules-cols{ display:grid; grid-template-columns: 1fr; gap: 8px; }
+  @media (min-width: 720px){ .rules-cols{ grid-template-columns: 1fr 1fr; } }
+  .rules-block ul { margin: 0 0 6px 20px; padding: 0; }
   .rules-block li { margin-bottom: 4px; }
   .rules-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 
   .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .tabs{display:flex;gap:8px;margin:10px 0}
-  .tab,.toggle{
-    padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer;background:#fff
-  }
+  .tab,.toggle{ padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer;background:#fff }
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
   .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
 
@@ -91,7 +74,6 @@
   td{height:18px;width:56px;padding:0}  /* data columns */
   .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
-  .footnote{margin-top:10px;font-size:12px;color:var(--muted)}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
 </style>
@@ -118,6 +100,10 @@
         <li>
           <b>St-Jean, Île d’Orléans</b> — NE 30–70°, <b>falling</b> tide, gust ≥10 kn<br/>
           <i>NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</i>
+        </li>
+        <li>
+          <b>Ange-Gardien</b> — SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
+          <i>SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
         </li>
       </ul>
     </div>
@@ -219,8 +205,8 @@
     return 'var(--g1)'; // 10–14
   }
 
-  // Group ALL rows by day for quick access
-  const byDayAll = new Map(); // day -> array of full rows
+  // Group ALL rows by day
+  const byDayAll = new Map();
   for(const row of hours){
     const t = toLocal(row.time);
     const k = dayKey(t);
@@ -233,9 +219,10 @@
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
   const spots = [
-    {key:'beauport', label:'Baie de Beauport'},
-    {key:'ste_anne', label:'Ste-Anne-de-Beaupré'},
-    {key:'st_jean', label:'St-Jean, Île d’Orléans'},
+    {key:'beauport',     label:'Baie de Beauport'},
+    {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
+    {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
+    {key:'ange_gardien', label:'Ange-Gardien'},
   ];
 
   const tabBar = document.getElementById('tabs');
@@ -274,7 +261,7 @@
     corner.textContent = 'Hour';
     htr.appendChild(corner);
 
-    // For each day: add a tiny tide stripe header cell + the day header
+    // For each day: tide stripe header + day header
     dayOrder.forEach(dk=>{
       const thStripe = document.createElement('th');
       thStripe.className = 'tideStripeHead';
@@ -317,15 +304,15 @@
         const obj = (map[dk] && map[dk][hrStr]) ? map[dk][hrStr] : {};
         const tideState = (obj && obj.tide) ? obj.tide : 'unknown';
 
-        // tide stripe cell (very narrow)
+        // tide stripe cell
         const tdStripe = document.createElement('td');
         tdStripe.className = 'tideStripe';
         tdStripe.style.background = tideStripeColor(tideState);
         tr.appendChild(tdStripe);
 
-        // spot data cell
+        // data cell
         const td = document.createElement('td');
-        const go = obj.go ? (obj.go.beauport ?? obj.go.ste_anne ?? obj.go.st_jean) : false;
+        const go = obj && obj.go ? !!obj.go[spotKey] : false;  // use THIS spot’s go flag
 
         let bg;
         if (obj.wind_kn == null) {
@@ -336,10 +323,11 @@
           bg = 'var(--blank)';             // criteria not met -> blank
         }
 
-        const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);           // gusts in kn
+        const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
         const avg  = (obj.wind_avg_kn == null ? '' : `, avg ${obj.wind_avg_kn} kn`);
         const deg  = obj.dir_deg;
-        const card = degToCardinal(deg);
+        const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+        const card = (deg==null) ? '' : dirs[Math.round(((deg%360)/45)) % 8];
         const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
 
         td.innerHTML = `<div class="cell" title="${tip}">${deg!=null ? arrowSVG(deg) : ''}</div>`;
@@ -359,9 +347,10 @@
     matrices.innerHTML = '';
     const views = {};
     const spots = [
-      {key:'beauport', label:'Baie de Beauport'},
-      {key:'ste_anne', label:'Ste-Anne-de-Beaupré'},
-      {key:'st_jean', label:'St-Jean, Île d’Orléans'},
+      {key:'beauport',     label:'Baie de Beauport'},
+      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
+      {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
+      {key:'ange_gardien', label:'Ange-Gardien'},
     ];
     spots.forEach((s,i)=>{
       const v = buildMatrix(s.key, mode);

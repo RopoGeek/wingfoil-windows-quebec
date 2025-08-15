@@ -1,42 +1,43 @@
-# check_spots.py — fast + reliable:
-# - Wind (gust/mean/dir): Open-Meteo (no key)
-# - Tide: SPINE (DFO) only for Baie de Beauport using a known-good seed coordinate
-# - Ste-Anne & St-Jean tide temporarily disabled to keep runs quick (wind still shows)
-# - "Go" uses GUSTS (kn). Ste-Anne needs SW & rising tide; St-Jean needs NE & falling tide.
+# check_spots.py — gust rules + IWLS tide predictions by station UUID (fast & reliable)
+# Wind: Open-Meteo (gust/mean/dir) — no key
+# Tide: CHS Integrated Water Level System (IWLS) predictions — no key
+#
+# How it works:
+# 1) Resolve CHS station codes -> UUIDs via /v3/stations?code=XXXX
+# 2) Fetch predicted water levels for [now, now+96h] via /v3/stations/{UUID}/predictions
+# 3) For each hour, classify tide as rising/falling/slack using nearest prediction before/after
+#
+# Stations:
+#   - Baie de Beauport:   Vieux-Québec 03248
+#   - Ste-Anne-de-Beaupré: 03087
+#   - St-Jean, Île d’Orléans: 03105
 
-import json, datetime as dt, urllib.request, urllib.parse, sys, time
+import json, datetime as dt, urllib.request, urllib.parse, sys
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
-HOURS = 96  # look ahead (4 days)
+HOURS = 96  # look ahead
 
-# -------- Switch tide per spot (quick + safe) --------
-ENABLE_TIDE_FOR = {
-    "beauport": True,   # SPINE enabled (seed works)
-    "ste_anne": False,  # keep False until we wire a stable source/point
-    "st_jean":  False,  # keep False until we wire a stable source/point
-}
-
-# -------- Spots (display/wind coords) --------
 SPOTS = {
-    "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},
-    "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280},
-    "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169},
+    "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006, "iwls_code": "03248"},
+    "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280, "iwls_code": "03087"},
+    "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169, "iwls_code": "03105"},
 }
 
-# -------- Gust thresholds (kn) --------
+# Gust thresholds (kn)
 THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
 
-# -------- Direction sectors (deg, "from") --------
-DIR_SW = (200, 250)  # Ste-Anne needs SW
-DIR_NE = (30, 70)    # St-Jean needs NE
+# Direction sectors (deg, "from")
+DIR_SW = (200, 250)  # Ste-Anne
+DIR_NE = (30, 70)    # St-Jean
 
 def is_dir_in_sector(deg, lo, hi): return (lo <= deg <= hi) if lo <= hi else (deg >= lo or deg <= hi)
 def in_SW(deg): return is_dir_in_sector(deg, *DIR_SW)
 def in_NE(deg): return is_dir_in_sector(deg, *DIR_NE)
 
-def http_get_json(url, timeout=45):
+# ---------------- HTTP helper ----------------
+def http_get_json(url, timeout=30):
     with urllib.request.urlopen(url, timeout=timeout) as r:
         return json.load(r)
 
@@ -53,56 +54,102 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     })
     return http_get_json(f"{base}?{qs}")
 
-# ---------------- TIDE (SPINE, batched) ----------------
-SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
+# ---------------- TIDE (IWLS) ----------------
+IWLS_BASE = "https://api-iwls.dfo-mpo.gc.ca"
 
-# Known-good SPINE mid-channel seed for Baie de Beauport (confirmed in your logs)
-SPINE_SEED_BEAUPORT = (46.8609, -71.1835)
+def iwls_station_uuid_from_code(code):
+    # Try v3 and legacy paths; return first matching UUID string
+    urls = [
+        f"{IWLS_BASE}/v3/stations?code={urllib.parse.quote(code)}",
+        f"{IWLS_BASE}/stations?code={urllib.parse.quote(code)}",
+    ]
+    for url in urls:
+        try:
+            data = http_get_json(url)
+            items = data.get("items") or data.get("stations") or (data if isinstance(data, list) else [])
+            if isinstance(items, list) and items:
+                st = items[0]
+                # UUID may be "id" or "uuid"
+                uuid = st.get("id") or st.get("uuid")
+                if uuid:
+                    return str(uuid)
+        except Exception as e:
+            print(f"[WARN] IWLS station lookup failed for code {code}: {e}", file=sys.stderr)
+    return None
 
-def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries=2):
-    """Fetch SPINE water levels for many times, in chunks (avoid 414). Returns dict[utc_iso]->level."""
-    out, n = {}, len(utc_list)
-    for i in range(0, n, chunk_size):
-        chunk = utc_list[i:i+chunk_size]
-        q = []
-        for t in chunk:
-            q += [("lat", f"{lat}"), ("lon", f"{lon}"), ("t", t)]
-        url = f"{SPINE_BASE}?{urllib.parse.urlencode(q)}"
-        tries = 0
-        while True:
-            try:
-                data = http_get_json(url)
-                items = data.get("responseItems", [])
-                ok = other = 0
-                for it in items:
-                    st = it.get("status")
-                    if st == "OK":
-                        inst = it.get("instant"); wl = it.get("waterLevel")
-                        if inst is not None and wl is not None:
-                            out[inst] = wl; ok += 1
-                    else:
-                        other += 1
-                print(f"[INFO] SPINE chunk {i//chunk_size+1}: {ok}/{len(chunk)} OK (+{other} non-OK) @({lat},{lon})", file=sys.stderr)
-                break
-            except Exception as e:
-                tries += 1
-                if tries > max_retries:
-                    print(f"[WARN] SPINE chunk failed after retries: {e}", file=sys.stderr)
-                    break
-                time.sleep(pause)
-    return out
+def iwls_predictions(uuid, begin_utc_iso, end_utc_iso):
+    # Fetch predicted levels for [begin,end] (UTC ISO). Try a couple of shapes.
+    enc = urllib.parse.quote
+    urls = [
+        f"{IWLS_BASE}/v3/stations/{uuid}/predictions?begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
+        f"{IWLS_BASE}/v3/stations/{uuid}/data?datatype=predictions&begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
+        f"{IWLS_BASE}/stations/{uuid}/predictions?begin={enc(begin_utc_iso)}&end={enc(end_utc_iso)}",
+    ]
+    for url in urls:
+        try:
+            data = http_get_json(url)
+            out = {}
+            seqs = []
+            if isinstance(data, dict):
+                if "predictions" in data and isinstance(data["predictions"], list):
+                    seqs = data["predictions"]
+                elif "items" in data and isinstance(data["items"], list):
+                    seqs = data["items"]
+            elif isinstance(data, list):
+                seqs = data
+            for it in seqs:
+                t = it.get("t") or it.get("time") or it.get("instant")
+                v = it.get("v") or it.get("value") or it.get("waterLevel")
+                if t is not None and v is not None:
+                    out[str(t)] = float(v)
+            if out:
+                return out
+        except Exception as e:
+            print(f"[WARN] IWLS predictions fetch failed for {uuid}: {e}", file=sys.stderr)
+    return {}
 
-def classify_trend(spine_map, t_utc_iso, t1_utc_iso, eps=0.02):
-    v0 = spine_map.get(t_utc_iso)
-    v1 = spine_map.get(t1_utc_iso)
-    if v0 is None or v1 is None:
+def classify_trend_at_hour(pred_map, utc_hour_iso, eps=0.02):
+    """Use nearest prediction before and after the hour (within ±3h) to decide rising/falling/slack."""
+    if not pred_map:
         return "unknown"
     try:
-        dv = float(v1) - float(v0)
+        t0 = dt.datetime.fromisoformat(utc_hour_iso.replace("Z","+00:00"))
     except Exception:
         return "unknown"
-    if dv > eps: return "rising"
-    if dv < -eps: return "falling"
+
+    items = []
+    for ts, val in pred_map.items():
+        try:
+            t = dt.datetime.fromisoformat(ts.replace("Z","+00:00"))
+            items.append((t, float(val)))
+        except Exception:
+            continue
+    if not items:
+        return "unknown"
+    items.sort(key=lambda x: x[0])
+
+    before = None
+    after = None
+    for (t, v) in items:
+        if t <= t0:
+            before = (t, v)
+        if t >= t0 and after is None:
+            after = (t, v)
+            break
+    # widen within ±3h if needed
+    def within(a,b,h): return abs((a-b).total_seconds()) <= h*3600
+    if before is None:
+        cand = [iv for iv in items if iv[0] < t0 and within(iv[0], t0, 3)]
+        if cand: before = max(cand, key=lambda x: x[0])
+    if after is None:
+        cand = [iv for iv in items if iv[0] > t0 and within(iv[0], t0, 3)]
+        if cand: after = min(cand, key=lambda x: x[0])
+
+    if not before or not after:
+        return "unknown"
+    vb, va = before[1], after[1]
+    if va > vb + eps:  return "rising"
+    if va < vb - eps:  return "falling"
     return "slack"
 
 # ---------------- Main ----------------
@@ -111,13 +158,13 @@ def main():
     end_local = NOW + dt.timedelta(hours=HOURS)
     result = {"generated_at": NOW.isoformat(), "hours": []}
 
-    # 1) Fetch wind for each spot
+    # 1) Wind for each spot
     wind = {}
     for key, spot in SPOTS.items():
         try:
             wj = fetch_open_meteo_wind(spot["lat"], spot["lon"], start_local, end_local)
             wind[key] = {
-                "time": wj["hourly"]["time"],                # local ISO strings
+                "time": wj["hourly"]["time"],                # local ISO
                 "avg":  wj["hourly"]["windspeed_10m"],       # kn
                 "gust": wj["hourly"]["windgusts_10m"],       # kn
                 "dir":  wj["hourly"]["winddirection_10m"],   # deg
@@ -126,48 +173,40 @@ def main():
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
             wind[key] = {"time": [], "avg": [], "gust": [], "dir": []}
 
-    # 2) Master timeline = Beauport wind times (prevents grey "missing data")
+    # 2) Master timeline = Beauport wind times (prevents grey)
     timeline_local = wind.get("beauport", {}).get("time", [])
     if not timeline_local:
         with open("forecast.json", "w", encoding="utf-8") as f:
             json.dump({"generated_at": NOW.isoformat(), "hours": []}, f, ensure_ascii=False, indent=2)
         return
 
-    # Build paired UTC times [t, t+1h] + flat list for SPINE
-    utc_pairs, flat_times = [], []
+    # Build UTC hour stamps for the whole window
+    utc_hours = []
     for tloc in timeline_local:
         t0 = dt.datetime.fromisoformat(tloc).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
-        t1 = t0 + dt.timedelta(hours=1)
-        a = t0.isoformat().replace("+00:00","Z")
-        b = t1.isoformat().replace("+00:00","Z")
-        utc_pairs.append((a,b))
-        flat_times += [a,b]
+        utc_hours.append(t0.isoformat().replace("+00:00","Z"))
+    begin_iso = utc_hours[0]
+    end_iso   = dt.datetime.fromisoformat(utc_hours[-1].replace("Z","+00:00")).isoformat().replace("+00:00","Z")
 
-    # 3) Tide maps (only for enabled spots)
-    spine_maps = {}
+    # 3) IWLS: resolve UUIDs and pull predictions per spot
+    tide_pred_maps = {}
     for key, spot in SPOTS.items():
-        if not ENABLE_TIDE_FOR.get(key, False):
-            print(f"[INFO] Tide disabled for {spot['name']} (skipping SPINE)", file=sys.stderr)
-            spine_maps[key] = {}
+        uuid = iwls_station_uuid_from_code(spot["iwls_code"])
+        if not uuid:
+            print(f"[WARN] No IWLS UUID for {spot['name']} (code {spot['iwls_code']})", file=sys.stderr)
+            tide_pred_maps[key] = {}
             continue
-
-        # For Beauport: use the known-good seed directly (fast & reliable)
-        seed_lat, seed_lon = SPINE_SEED_BEAUPORT
-        trial_flat = [t for ab in utc_pairs[:2] for t in ab]  # tiny trial
-        seed_trial = spine_levels_batch(seed_lat, seed_lon, trial_flat, chunk_size=24)
-        ok_seed = sum(1 for t in trial_flat if t in seed_trial)
-        if ok_seed > 0:
-            print(f"[INFO] Using SPINE seed for {spot['name']}: ({seed_lat},{seed_lon}) with {ok_seed} OK trials", file=sys.stderr)
-            full_map = spine_levels_batch(seed_lat, seed_lon, flat_times, chunk_size=36)
-            spine_maps[key] = full_map
+        preds = iwls_predictions(uuid, begin_iso, end_iso)
+        if preds:
+            print(f"[INFO] IWLS predictions loaded for {spot['name']} (code {spot['iwls_code']}, uuid {uuid[:8]}…): {len(preds)} points", file=sys.stderr)
         else:
-            print(f"[INFO] SPINE seed returned no data for {spot['name']} — leaving tide unknown", file=sys.stderr)
-            spine_maps[key] = {}
+            print(f"[INFO] IWLS predictions EMPTY for {spot['name']} (code {spot['iwls_code']}, uuid {uuid[:8]}…)", file=sys.stderr)
+        tide_pred_maps[key] = preds
 
-    # 4) Compose rows
+    # 4) Compose rows (one per hour)
     for i, t_loc_iso in enumerate(timeline_local):
         row = {"time": t_loc_iso}
-        t0_utc, t1_utc = utc_pairs[i]
+        utc_iso = utc_hours[i]
 
         for key, spot in SPOTS.items():
             gust = avg = d = None
@@ -180,9 +219,8 @@ def main():
             except Exception:
                 pass
 
-            tide_status = classify_trend(spine_maps.get(key, {}), t0_utc, t1_utc) if ENABLE_TIDE_FOR.get(key, False) else "unknown"
+            tide_status = classify_trend_at_hour(tide_pred_maps.get(key, {}), utc_iso)
 
-            # Evaluate rules (gust-based)
             thr = THRESHOLD_GUST[key]
             if key == "beauport":
                 go_flag = (gust is not None and gust >= thr)

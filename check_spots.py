@@ -1,32 +1,36 @@
-# check_spots.py — gust rules + SPINE tide with seeds + fine grid auto-discovery
-# Wind: Open-Meteo (gust/mean/dir) — no key
-# Tide: DFO SPINE water-level forecast — batched; tries seed points first, then fine grid search
-#
-# Notes:
-# - SPINE returns values only on its navigation-channel cells. We first try hand-picked seeds
-#   and then search a fine grid around each spot along the river axis.
-# - Keeps gust-based rules (10 kn for all 3).
+# check_spots.py — fast + reliable:
+# - Wind (gust/mean/dir): Open-Meteo (no key)
+# - Tide: SPINE (DFO) only for Baie de Beauport using a known-good seed coordinate
+# - Ste-Anne & St-Jean tide temporarily disabled to keep runs quick (wind still shows)
+# - "Go" uses GUSTS (kn). Ste-Anne needs SW & rising tide; St-Jean needs NE & falling tide.
 
 import json, datetime as dt, urllib.request, urllib.parse, sys, time
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
-HOURS = 96  # look ahead
+HOURS = 96  # look ahead (4 days)
 
-# Display coordinates (for wind)
+# -------- Switch tide per spot (quick + safe) --------
+ENABLE_TIDE_FOR = {
+    "beauport": True,   # SPINE enabled (seed works)
+    "ste_anne": False,  # keep False until we wire a stable source/point
+    "st_jean":  False,  # keep False until we wire a stable source/point
+}
+
+# -------- Spots (display/wind coords) --------
 SPOTS = {
     "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},
     "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280},
     "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169},
 }
 
-# Gust thresholds (kn)
+# -------- Gust thresholds (kn) --------
 THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
 
-# Direction sectors (deg, "from")
-DIR_SW = (200, 250)  # Ste-Anne
-DIR_NE = (30, 70)    # St-Jean
+# -------- Direction sectors (deg, "from") --------
+DIR_SW = (200, 250)  # Ste-Anne needs SW
+DIR_NE = (30, 70)    # St-Jean needs NE
 
 def is_dir_in_sector(deg, lo, hi): return (lo <= deg <= hi) if lo <= hi else (deg >= lo or deg <= hi)
 def in_SW(deg): return is_dir_in_sector(deg, *DIR_SW)
@@ -36,7 +40,7 @@ def http_get_json(url, timeout=45):
     with urllib.request.urlopen(url, timeout=timeout) as r:
         return json.load(r)
 
-# ---------- WIND (Open-Meteo) ----------
+# ---------------- WIND (Open-Meteo) ----------------
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
@@ -49,11 +53,14 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     })
     return http_get_json(f"{base}?{qs}")
 
-# ---------- TIDE (SPINE) ----------
+# ---------------- TIDE (SPINE, batched) ----------------
 SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
 
+# Known-good SPINE mid-channel seed for Baie de Beauport (confirmed in your logs)
+SPINE_SEED_BEAUPORT = (46.8609, -71.1835)
+
 def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries=2):
-    """Fetch SPINE water levels for many times, in chunks to avoid 414. Returns dict[utc_iso]->level."""
+    """Fetch SPINE water levels for many times, in chunks (avoid 414). Returns dict[utc_iso]->level."""
     out, n = {}, len(utc_list)
     for i in range(0, n, chunk_size):
         chunk = utc_list[i:i+chunk_size]
@@ -67,7 +74,6 @@ def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries
                 data = http_get_json(url)
                 items = data.get("responseItems", [])
                 ok = other = 0
-                sample_other = []
                 for it in items:
                     st = it.get("status")
                     if st == "OK":
@@ -76,9 +82,7 @@ def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries
                             out[inst] = wl; ok += 1
                     else:
                         other += 1
-                        if len(sample_other) < 3:
-                            sample_other.append(st)
-                print(f"[INFO] SPINE chunk {i//chunk_size+1}: {ok}/{len(chunk)} OK (+{other} non-OK: {sample_other}) @({lat},{lon})", file=sys.stderr)
+                print(f"[INFO] SPINE chunk {i//chunk_size+1}: {ok}/{len(chunk)} OK (+{other} non-OK) @({lat},{lon})", file=sys.stderr)
                 break
             except Exception as e:
                 tries += 1
@@ -101,93 +105,13 @@ def classify_trend(spine_map, t_utc_iso, t1_utc_iso, eps=0.02):
     if dv < -eps: return "falling"
     return "slack"
 
-# ---- Seeds (mid-channel guesses), then fine search if needed ----
-SPINE_SEEDS = {
-    "beauport": [(46.8609, -71.1835)],  # previously confirmed working
-    "ste_anne": [
-        # along-channel seeds (a few km window)
-        (47.0200, -70.9360),
-        (47.0100, -70.9220),
-        (47.0250, -70.9150),
-        (47.0000, -70.9300),
-    ],
-    "st_jean": [
-        (46.8700, -70.8000),
-        (46.8800, -70.8300),
-        (46.8650, -70.8200),
-        (46.8750, -70.8050),
-    ],
-}
-
-def discover_spine_proxy(name, lat, lon, trial_pairs):
-    """
-    Try seeds first; if none OK, scan a fine grid: lat in [lat±0.06] step 0.005, lon in [lon±0.12] step 0.005
-    Return (best_map, best_lat, best_lon). If none OK, ({}, None, None)
-    """
-    # Flatten trial times (t and t+1h per row)
-    trial_flat = []
-    for a,b in trial_pairs:
-        trial_flat += [a,b]
-
-    # 1) Try seeds
-    seeds = SPINE_SEEDS.get(name_key(name), [])
-    for (plat, plon) in seeds:
-        m = spine_levels_batch(plat, plon, trial_flat, chunk_size=24)
-        ok_count = sum(1 for k in trial_flat if k in m)
-        print(f"[INFO] SPINE seed @{(plat,plon)} for {name}: {ok_count} OK", file=sys.stderr)
-        if ok_count > 0:
-            print(f"[INFO] SPINE seed SELECTED for {name}: ({plat},{plon})", file=sys.stderr)
-            return m, plat, plon
-
-    # 2) Fine grid search (prioritize east-west along river)
-    lat_min, lat_max = lat - 0.06, lat + 0.06
-    lon_min, lon_max = lon - 0.12, lon + 0.12
-    step = 0.005  # ~550m
-    best = (0, None, None, {})
-    # Sweep lon first (east-west), then a couple of lat bands around the spot
-    lat_list = [lat + i*step for i in range(-12, 13)]  # 25 bands
-    lon_list = [lon + j*step for j in range(-24, 25)]  # 49 steps
-    tested = 0
-    for li in [0, -1, 1, -2, 2, -3, 3] + list(range(-12,13)):  # center-out order
-        lat_cur = lat + li*step
-        if lat_cur < lat_min or lat_cur > lat_max: continue
-        for lj in list(range(-24, 25)):
-            lon_cur = lon + lj*step
-            if lon_cur < lon_min or lon_cur > lon_max: continue
-            tested += 1
-            m = spine_levels_batch(lat_cur, lon_cur, trial_flat, chunk_size=24)
-            ok_count = sum(1 for k in trial_flat if k in m)
-            if ok_count > 0:
-                print(f"[INFO] SPINE trial @{(lat_cur,lon_cur)} for {name}: {ok_count} OK", file=sys.stderr)
-            if ok_count > best[0]:
-                best = (ok_count, lat_cur, lon_cur, m)
-            # stop early if we already have ≥ half the requested points OK
-            if best[0] >= len(trial_flat) // 2:
-                break
-        if best[0] >= len(trial_flat) // 2:
-            break
-
-    if best[0] > 0:
-        print(f"[INFO] SPINE auto-selected proxy for {name}: ({best[1]:.5f},{best[2]:.5f}) with {best[0]} OK trial points (tested {tested} locs)", file=sys.stderr)
-        return best[3], best[1], best[2]
-    else:
-        print(f"[INFO] SPINE auto-discovery FAILED for {name} (tested {tested} locs)", file=sys.stderr)
-        return {}, None, None
-
-def name_key(human_name):
-    # map human name back to our spot keys for seed lookup
-    s = human_name.lower()
-    if "beauport" in s: return "beauport"
-    if "anne" in s: return "ste_anne"
-    if "st-jean" in s or "saint-jean" in s or "î" in s: return "st_jean"
-    return "beauport"
-
+# ---------------- Main ----------------
 def main():
     start_local = NOW
     end_local = NOW + dt.timedelta(hours=HOURS)
     result = {"generated_at": NOW.isoformat(), "hours": []}
 
-    # 1) Wind for each spot
+    # 1) Fetch wind for each spot
     wind = {}
     for key, spot in SPOTS.items():
         try:
@@ -202,14 +126,14 @@ def main():
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
             wind[key] = {"time": [], "avg": [], "gust": [], "dir": []}
 
-    # 2) Master timeline = Beauport wind times
+    # 2) Master timeline = Beauport wind times (prevents grey "missing data")
     timeline_local = wind.get("beauport", {}).get("time", [])
     if not timeline_local:
         with open("forecast.json", "w", encoding="utf-8") as f:
             json.dump({"generated_at": NOW.isoformat(), "hours": []}, f, ensure_ascii=False, indent=2)
         return
 
-    # Paired UTC list [t, t+1h] and a flat list for full fetches
+    # Build paired UTC times [t, t+1h] + flat list for SPINE
     utc_pairs, flat_times = [], []
     for tloc in timeline_local:
         t0 = dt.datetime.fromisoformat(tloc).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
@@ -219,18 +143,25 @@ def main():
         utc_pairs.append((a,b))
         flat_times += [a,b]
 
-    # 3) Discover/seed a working SPINE point per spot, then fetch ALL hours there
+    # 3) Tide maps (only for enabled spots)
     spine_maps = {}
     for key, spot in SPOTS.items():
-        # Use 4-hour discovery window
-        trial_pairs = utc_pairs[:4] if len(utc_pairs) >= 4 else utc_pairs
-        trial_map, plat, plon = discover_spine_proxy(spot["name"], spot["lat"], spot["lon"], trial_pairs)
-        if plat is not None:
-            full_map = spine_levels_batch(plat, plon, flat_times, chunk_size=36)
-            if not full_map:
-                print(f"[INFO] SPINE full-fetch empty for {spot['name']} @({plat},{plon})", file=sys.stderr)
+        if not ENABLE_TIDE_FOR.get(key, False):
+            print(f"[INFO] Tide disabled for {spot['name']} (skipping SPINE)", file=sys.stderr)
+            spine_maps[key] = {}
+            continue
+
+        # For Beauport: use the known-good seed directly (fast & reliable)
+        seed_lat, seed_lon = SPINE_SEED_BEAUPORT
+        trial_flat = [t for ab in utc_pairs[:2] for t in ab]  # tiny trial
+        seed_trial = spine_levels_batch(seed_lat, seed_lon, trial_flat, chunk_size=24)
+        ok_seed = sum(1 for t in trial_flat if t in seed_trial)
+        if ok_seed > 0:
+            print(f"[INFO] Using SPINE seed for {spot['name']}: ({seed_lat},{seed_lon}) with {ok_seed} OK trials", file=sys.stderr)
+            full_map = spine_levels_batch(seed_lat, seed_lon, flat_times, chunk_size=36)
             spine_maps[key] = full_map
         else:
+            print(f"[INFO] SPINE seed returned no data for {spot['name']} — leaving tide unknown", file=sys.stderr)
             spine_maps[key] = {}
 
     # 4) Compose rows
@@ -249,7 +180,7 @@ def main():
             except Exception:
                 pass
 
-            tide_status = classify_trend(spine_maps.get(key, {}), t0_utc, t1_utc)
+            tide_status = classify_trend(spine_maps.get(key, {}), t0_utc, t1_utc) if ENABLE_TIDE_FOR.get(key, False) else "unknown"
 
             # Evaluate rules (gust-based)
             thr = THRESHOLD_GUST[key]
@@ -263,8 +194,8 @@ def main():
                 go_flag = False
 
             row[key] = {
-                "wind_kn": round(gust, 1) if gust is not None else None,
-                "wind_avg_kn": round(avg, 1) if avg is not None else None,
+                "wind_kn": round(gust, 1) if gust is not None else None,       # gusts
+                "wind_avg_kn": round(avg, 1) if avg is not None else None,     # mean
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {

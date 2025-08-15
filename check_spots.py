@@ -1,8 +1,8 @@
-# check_spots.py — gust-based rules + SPINE tide using channel-proxy coordinates (robust)
+# check_spots.py — gust-based rules + SPINE tide with BATCHED requests (fixes HTTP 414)
 # Wind: Open-Meteo (gust/mean/dir) — no key
-# Tide: DFO SPINE water-level forecast at nearby channel points — no key
+# Tide: DFO SPINE water-level forecast (batched lat/lon+t) — no key
 
-import json, datetime as dt, urllib.request, urllib.parse, sys
+import json, datetime as dt, urllib.request, urllib.parse, sys, time
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Toronto")
@@ -12,7 +12,7 @@ HOURS = 96  # look ahead
 SPOTS = {
     "beauport": {
         "name": "Baie de Beauport",
-        "lat": 46.8598, "lon": -71.2006,           # display/ wind point
+        "lat": 46.8598, "lon": -71.2006,
         "spine_lat": 46.8609, "spine_lon": -71.1835  # channel proxy
     },
     "ste_anne": {
@@ -27,10 +27,10 @@ SPOTS = {
     },
 }
 
-# Gust thresholds (kn) — you asked for 10 kn at all 3 spots
+# Gust thresholds (kn)
 THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
 
-# Direction sectors (deg "from")
+# Direction sectors (deg, "from"):
 DIR_SW = (200, 250)  # Ste-Anne
 DIR_NE = (30, 70)    # St-Jean
 
@@ -42,7 +42,7 @@ def http_get_json(url, timeout=45):
     with urllib.request.urlopen(url, timeout=timeout) as r:
         return json.load(r)
 
-# -------- WIND (Open-Meteo) ----------
+# ---------- WIND (Open-Meteo) ----------
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
@@ -55,23 +55,46 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
     })
     return http_get_json(f"{base}?{qs}")
 
-# -------- TIDE (SPINE) ----------
+# ---------- TIDE (SPINE) ----------
 SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLevel"
 
-def spine_levels_for_hours(lat, lon, utc_list):
-    # Batch request: repeat lat, lon, t for all hours in list
-    q = []
-    for t in utc_list:
-        q += [("lat", f"{lat}"), ("lon", f"{lon}"), ("t", t)]
-    url = f"{SPINE_BASE}?{urllib.parse.urlencode(q)}"
-    try:
-        data = http_get_json(url)
-        items = data.get("responseItems", [])
-        out = {it.get("instant"): it.get("waterLevel") for it in items if it.get("status") == "OK"}
-        return out
-    except Exception as e:
-        print(f"[WARN] SPINE fetch failed @({lat},{lon}): {e}", file=sys.stderr)
-        return {}
+def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries=2):
+    """
+    Fetch SPINE water levels for many times, in small chunks to avoid 414 (URI too large).
+    Returns dict[utc_iso] -> level (m) for times that returned status OK.
+    """
+    out = {}
+    n = len(utc_list)
+    for i in range(0, n, chunk_size):
+        chunk = utc_list[i:i+chunk_size]
+        # Build query for this chunk
+        q = []
+        for t in chunk:
+            q += [("lat", f"{lat}"), ("lon", f"{lon}"), ("t", t)]
+        url = f"{SPINE_BASE}?{urllib.parse.urlencode(q)}"
+        # retry on transient errors / 5xx
+        tries = 0
+        while True:
+            try:
+                data = http_get_json(url)
+                items = data.get("responseItems", [])
+                got = 0
+                for it in items:
+                    if it.get("status") == "OK":
+                        inst = it.get("instant")
+                        wl = it.get("waterLevel")
+                        if inst is not None and wl is not None:
+                            out[inst] = wl
+                            got += 1
+                print(f"[INFO] SPINE chunk {i//chunk_size+1}: got {got}/{len(chunk)} points @({lat},{lon})", file=sys.stderr)
+                break
+            except Exception as e:
+                tries += 1
+                if tries > max_retries:
+                    print(f"[WARN] SPINE chunk failed after retries: {e}", file=sys.stderr)
+                    break
+                time.sleep(pause)
+    return out
 
 def classify_trend(spine_map, t_utc_iso, t1_utc_iso):
     v0 = spine_map.get(t_utc_iso)
@@ -105,28 +128,29 @@ def main():
             print(f"[WARN] Wind fetch failed for {spot['name']}: {e}", file=sys.stderr)
             wind[key] = {"time": [], "avg": [], "gust": [], "dir": []}
 
-    # 2) Master timeline = Beauport wind times (ensures we always render)
+    # 2) Master timeline = Beauport wind times
     timeline_local = wind.get("beauport", {}).get("time", [])
     if not timeline_local:
         with open("forecast.json", "w", encoding="utf-8") as f:
             json.dump({"generated_at": NOW.isoformat(), "hours": []}, f, ensure_ascii=False, indent=2)
         return
 
-    # Build paired UTC times [t, t+1h] for SPINE
+    # Build paired UTC times [t, t+1h] and a flat list for batching
     utc_pairs = []
+    flat_times = []
     for tloc in timeline_local:
         t0 = dt.datetime.fromisoformat(tloc).replace(tzinfo=TZ).astimezone(dt.timezone.utc)
         t1 = t0 + dt.timedelta(hours=1)
-        utc_pairs.append( (t0.isoformat().replace("+00:00","Z"), t1.isoformat().replace("+00:00","Z")) )
+        a = t0.isoformat().replace("+00:00","Z")
+        b = t1.isoformat().replace("+00:00","Z")
+        utc_pairs.append((a,b))
+        flat_times.append(a)
+        flat_times.append(b)
 
-    # 3) Fetch SPINE for each spot at the proxy channel location
+    # 3) Fetch SPINE for each spot in CHUNKS and merge
     spine_maps = {}
-    # We’ll request all t and all t+1h in a single batch per spot
     for key, spot in SPOTS.items():
-        t_list = []
-        for a,b in utc_pairs:
-            t_list.append(a); t_list.append(b)
-        m = spine_levels_for_hours(spot["spine_lat"], spot["spine_lon"], t_list)
+        m = spine_levels_batch(spot["spine_lat"], spot["spine_lon"], flat_times, chunk_size=36)
         if not m:
             print(f"[INFO] SPINE returned empty map near {spot['name']} (proxy {spot['spine_lat']},{spot['spine_lon']})", file=sys.stderr)
         spine_maps[key] = m

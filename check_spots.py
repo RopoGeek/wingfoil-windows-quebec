@@ -1,6 +1,6 @@
 # check_spots.py — Wind + Tides (Open-Meteo + DFO SPINE) with CHS-style offsets
 # - Wind: Open-Meteo (auto model selection for Québec)
-# - Tides: SPINE baseline near Baie de Beauport; Sainte-Anne & St-Jean = time-shifted estimates
+# - Tides: SPINE baseline near Baie de Beauport; other spots = time-shifted estimates
 # - “Go” rules use gusts >= 10 kn + spot-specific direction + tide
 # - Output: forecast.json consumed by index.html
 
@@ -14,16 +14,17 @@ NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
 HOURS = 96  # forecast horizon (hours)
 
 SPOTS = {
-    "beauport": {"name": "Baie de Beauport", "lat": 46.8598, "lon": -71.2006},
-    "ste_anne": {"name": "Quai Ste-Anne-de-Beaupré", "lat": 47.0153, "lon": -70.9280},
-    "st_jean":  {"name": "Quai St-Jean, Île d’Orléans", "lat": 46.8577, "lon": -70.8169},
+    "beauport":     {"name": "Baie de Beauport",             "lat": 46.8598,    "lon": -71.2006},
+    "ste_anne":     {"name": "Quai Ste-Anne-de-Beaupré",     "lat": 47.0153,    "lon": -70.9280},
+    "st_jean":      {"name": "Quai St-Jean, Île d’Orléans",  "lat": 46.8577,    "lon": -70.8169},
+    "ange_gardien": {"name": "Ange-Gardien",                  "lat": 46.907944,  "lon": -71.090028},  # 46°54'28.6"N 71°05'24.1"W
 }
 
 # Gust thresholds (kn)
-THRESHOLD_GUST = {"beauport": 10.0, "ste_anne": 10.0, "st_jean": 10.0}
+THRESHOLD_GUST = {k: 10.0 for k in SPOTS.keys()}
 
 # Direction sectors (deg, FROM)
-DIR_SW = (200, 250)  # Ste-Anne
+DIR_SW = (200, 250)  # Ste-Anne / Ange-Gardien
 DIR_NE = (30, 70)    # St-Jean
 def _in_sector(deg, lo, hi): return (lo <= deg <= hi) if lo <= hi else (deg >= lo or deg <= hi)
 def in_SW(deg): return _in_sector(deg, *DIR_SW)
@@ -34,7 +35,7 @@ SPINE_BASE = "https://api-spine.azure.cloud-nuage.dfo-mpo.gc.ca/rest/v1/waterLev
 
 # Candidate points around Beauport (we’ll pick the one that returns the most data)
 BASELINE_CANDIDATES = [
-    (46.8609, -71.1835),  # this one worked in your earlier logs
+    (46.8609, -71.1835),
     (46.8420, -71.2100),
     (46.8750, -71.1600),
     (46.8350, -71.2450),
@@ -46,8 +47,9 @@ MAX_T_MATCH_MIN = 75      # tolerate ±75 min difference for matching SPINE inst
 
 # CHS-style phase offsets (minutes): rising uses LLW offset; falling uses HHW offset
 TIDE_PHASE_OFFSETS = {
-    "ste_anne": {"rising": 23, "falling": 10},
-    "st_jean":  {"rising": 17, "falling": 8},
+    "ste_anne":     {"rising": 23, "falling": 10},
+    "st_jean":      {"rising": 17, "falling":  8},
+    "ange_gardien": {"rising": 23, "falling": 10},  # same as Ste-Anne (proximity & similar exposure)
 }
 
 # ----- HTTP helper -----
@@ -159,7 +161,7 @@ def _nearest_hour_utc(t: dt.datetime) -> dt.datetime:
 def apply_spot_tide_offsets(out_data: dict):
     """
     Use Beauport tide phase as baseline and synthesize tide phase for
-    Sainte-Anne & St-Jean by applying CHS-style time offsets (minutes).
+    other spots by applying CHS-style time offsets (minutes).
     """
     hours = out_data.get("hours", [])
     if not hours: return
@@ -243,7 +245,7 @@ def main():
 
     baseline_map = {}
     baseline_latlon = None
-    if best and best[0] >= max(6, len(trial)//6):  # relaxed: ~≥16% of trial or at least 6 instants
+    if best and best[0] >= max(6, len(trial)//6):  # relaxed: ≥6 or ≥~16% of trial
         plat, plon = best[1]
         print(f"[INFO] Baseline SELECTED @({plat},{plon}) — fetching full horizon", file=sys.stderr)
         baseline_map = spine_levels_batch(plat, plon, flat_times, chunk_size=36)
@@ -289,6 +291,8 @@ def main():
                 go_flag = (gust is not None and gust >= thr and d is not None and in_SW(d) and tide_status == "rising")
             elif key == "st_jean":
                 go_flag = (gust is not None and gust >= thr and d is not None and in_NE(d) and tide_status == "falling")
+            elif key == "ange_gardien":
+                go_flag = (gust is not None and gust >= thr and d is not None and in_SW(d) and tide_status == "rising")
             else:
                 go_flag = False
 
@@ -298,15 +302,16 @@ def main():
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
                 "go": {
-                    "beauport": go_flag if key=="beauport" else None,
-                    "ste_anne": go_flag if key=="ste_anne" else None,
-                    "st_jean":  go_flag if key=="st_jean" else None
+                    "beauport":     go_flag if key=="beauport"     else None,
+                    "ste_anne":     go_flag if key=="ste_anne"     else None,
+                    "st_jean":      go_flag if key=="st_jean"      else None,
+                    "ange_gardien": go_flag if key=="ange_gardien" else None,
                 }
             }
 
         result["hours"].append(row)
 
-    # 6) Apply CHS-style time offsets to synthesize tides for Ste-Anne & St-Jean
+    # 6) Apply CHS-style time offsets to synthesize tides for non-baseline spots
     apply_spot_tide_offsets(result)
 
     # 7) Debug + metadata
@@ -316,13 +321,9 @@ def main():
         "lat": (baseline_latlon[0] if baseline_latlon else None),
         "lon": (baseline_latlon[1] if baseline_latlon else None),
         "max_match_minutes": MAX_T_MATCH_MIN,
-        "note": "Ste-Anne & St-Jean tides are time-shifted estimates from Beauport using TIDE_PHASE_OFFSETS."
+        "note": "Non-Baseline tides are time-shifted estimates from Beauport using TIDE_PHASE_OFFSETS."
     }
-    result["debug_counts"] = {
-        "beauport": count_trend(result["hours"], "beauport"),
-        "ste_anne": count_trend(result["hours"], "ste_anne"),
-        "st_jean":  count_trend(result["hours"], "st_jean"),
-    }
+    result["debug_counts"] = {k: count_trend(result["hours"], k) for k in SPOTS.keys()}
     result["wind_models"] = "Open-Meteo auto (no models= param)"
 
     with open("forecast.json", "w", encoding="utf-8") as f:

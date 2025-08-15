@@ -31,11 +31,41 @@
     --tide-slack:#bbb;  /* light grey for Slack */
     --tide-unk:transparent;
   }
+
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
   header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  h1{font-size:20px;margin:0}
+  h1{font-size:22px;margin:0}
   .pill{border:1px solid #aaa;border-radius:999px;padding:2px 8px;font-size:12px;color:#444}
   .muted{color:var(--muted);font-size:13px}
+
+  /* Rules block (top, bilingual) */
+  .rules-block {
+    margin: 16px 0 8px;
+    font-size: 15px;
+    line-height: 1.45;
+    background: #fafafa;
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .rules-block h2 {
+    font-size: 18px;
+    margin: 0 0 8px;
+  }
+  .rules-cols{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  @media (min-width: 720px){
+    .rules-cols{ grid-template-columns: 1fr 1fr; }
+  }
+  .rules-block ul {
+    margin: 0 0 6px 20px;
+    padding: 0;
+  }
+  .rules-block li { margin-bottom: 4px; }
+  .rules-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 
   .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .tabs{display:flex;gap:8px;margin:10px 0}
@@ -44,6 +74,7 @@
   }
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
   .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
+
   .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px;flex-wrap:wrap}
   .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
 
@@ -69,10 +100,46 @@
   <h1>Wingfoil Windows – Québec Area</h1>
   <span class="pill">Local time (America/Toronto)</span>
 </header>
+
+<!-- Bilingual rules at the top -->
+<div class="rules-block">
+  <h2>Spot Conditions / Conditions par site</h2>
+  <div class="rules-cols">
+    <div>
+      <ul>
+        <li>
+          <b>Baie de Beauport</b> — Gust ≥10 kn, any wind direction<br/>
+          <i>Rafales ≥10 nœuds, toute direction de vent</i>
+        </li>
+        <li>
+          <b>Ste-Anne-de-Beaupré</b> — SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
+          <i>SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
+        </li>
+        <li>
+          <b>St-Jean, Île d’Orléans</b> — NE 30–70°, <b>falling</b> tide, gust ≥10 kn<br/>
+          <i>NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</i>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <p class="rules-note">
+        Arrows point <b>from</b> the wind’s source (mean wind direction).<br/>
+        <i>Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</i>
+      </p>
+      <p class="rules-note">
+        The thin colored stripe next to each day shows the tide phase at the selected spot
+        (green = rising, red = falling, grey = slack).<br/>
+        <i>La fine bande colorée à côté de chaque jour indique la phase de marée au site sélectionné
+        (vert = montante, rouge = descendante, gris = étale).</i>
+      </p>
+    </div>
+  </div>
+</div>
+
 <p class="muted">
-  Flip between spots below. Use the toggle to show <b>Daylight (06–21)</b> or <b>All hours (00–23)</b>.
-  Days are columns, hours are rows. Cells are colored by <b>gust strength</b> only when the spot’s rules are met.
-  Hover a cell to see <b>gust</b>, <b>avg</b>, cardinal & tide.
+  Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Days are columns, hours are rows.
+  Cells are colored by <b>gust strength</b> only when the spot’s rules are met. Hover a cell to see
+  <b>gust</b>, <b>avg</b>, cardinal & tide.
 </p>
 
 <div class="controls">
@@ -91,21 +158,11 @@
   <span class="swatch" style="background:var(--r1)"></span> 25–30 kn
   <span class="swatch" style="background:var(--r2)"></span> ≥30 kn
   &nbsp; | &nbsp;
-  <span class="swatch" style="background:var(--neutral)"></span> Missing data
-  <span class="swatch" style="background:var(--blank)"></span> Criteria not met
+  <span class="swatch" style="background:var(--neutral)"></span> Missing data / Données manquantes
+  <span class="swatch" style="background:var(--blank)"></span> Criteria not met / Critères non remplis
 </div>
 
 <div id="matrices"></div>
-
-<p class="footnote">
-  Rules:
-  <b>Baie de Beauport</b> ≥10 kn gust (any direction);
-  <b>Ste-Anne-de-Beaupré</b> SW 200–250° & rising tide & ≥10 kn gust;
-  <b>St-Jean, Île d’Orléans</b> NE 30–70° & falling tide & ≥10 kn gust.
-  Arrow points <b>from</b> the wind’s source (based on mean wind direction).
-  The thin colored stripe next to each day shows the tide phase at the <b>selected spot</b> for that hour:
-  dark green = Rising, dark red = Falling (light grey = Slack, transparent = Unknown).
-</p>
 
 <script>
 (async function(){
@@ -119,7 +176,7 @@
     data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
   }catch(e){
     document.body.insertAdjacentHTML('beforeend',
-      '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab), or wait for it to run automatically.</p>');
+      '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab).</p>');
     return;
   }
   const hours = data.hours || [];
@@ -159,7 +216,7 @@
     if (v >= 21) return 'var(--y2)';
     if (v >= 18) return 'var(--y1)';
     if (v >= 14) return 'var(--g2)';
-    return 'var(--g1)'; // covers 10–14 (and just above threshold)
+    return 'var(--g1)'; // 10–14
   }
 
   // Group ALL rows by day for quick access

@@ -58,26 +58,8 @@
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
   .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
 
-  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 10px;flex-wrap:wrap}
+  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 14px;flex-wrap:wrap}
   .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
-
-  /* Sticky info bar for tap/focus */
-  .info-bar{
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:8px 10px;
-    border:1px solid var(--grid-border);
-    border-radius:10px;
-    background:#fffffe;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
-    font-size:14px;
-  }
-  .info-bar .arrow{width:18px;height:18px}
-  .info-dim{color:var(--muted)}
 
   /* Matrix */
   .matrix-wrap{overflow-x:auto;border:1px solid var(--grid-border);border-radius:10px}
@@ -90,11 +72,7 @@
   th.tideStripeHead{width:6px;padding:0;background:#fafafa}
   td.tideStripe{width:6px;padding:0}
   td{height:18px;width:56px;padding:0}  /* data columns */
-  .cell{
-    height:18px;display:flex;align-items:center;justify-content:center;
-    outline:none; cursor:pointer;
-  }
-  .cell:focus{box-shadow: inset 0 0 0 2px #8fd4a8}
+  .cell{height:18px;display:flex;align-items:center;justify-content:center}
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
@@ -135,8 +113,10 @@
         <i>Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</i>
       </p>
       <p class="rules-note">
-        Thin colored stripe by each day shows the tide phase (green = rising, red = falling, grey = slack).<br/>
-        <i>La fine bande à côté de chaque jour indique la phase de marée (vert = montante, rouge = descendante, gris = étale).</i>
+        The thin colored stripe next to each day shows the tide phase at the selected spot
+        (green = rising, red = falling, grey = slack).<br/>
+        <i>La fine bande colorée à côté de chaque jour indique la phase de marée au site sélectionné
+        (vert = montante, rouge = descendante, gris = étale).</i>
       </p>
     </div>
   </div>
@@ -144,7 +124,8 @@
 
 <p class="muted">
   Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Days are columns, hours are rows.
-  Cells are colored by <b>gust strength</b> only when the spot’s rules are met.
+  Cells are colored by <b>gust strength</b> only when the spot’s rules are met. Hover a cell to see
+  <b>gust</b>, <b>avg</b>, cardinal & tide.
 </p>
 
 <div class="controls">
@@ -153,11 +134,6 @@
     <button class="toggle active" id="tgl-daylight">Daylight</button>
     <button class="toggle" id="tgl-all">All hours</button>
   </div>
-</div>
-
-<!-- Sticky info bar (updates on tap/click/focus) -->
-<div class="info-bar" id="infoBar">
-  <span class="info-dim">Tap a cell</span>
 </div>
 
 <div class="legend">
@@ -209,10 +185,10 @@
     return dirs[ix];
   }
   // Arrow shows "from" direction; rotate an up arrow by (180 + deg).
-  function arrowSVG(deg, size=12){
+  function arrowSVG(deg){
     if (deg==null || isNaN(deg)) return '';
     const rot = (180 + Number(deg)) % 360;
-    return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg);width:${size}px;height:${size}px">
+    return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg)">
       <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
     </svg>`;
   }
@@ -251,7 +227,6 @@
 
   const tabBar = document.getElementById('tabs');
   const matrices = document.getElementById('matrices');
-  const infoBar = document.getElementById('infoBar');
 
   // Build tabs
   spots.forEach((s,i)=>{
@@ -271,7 +246,7 @@
   }
 
   function buildMatrix(spotKey, mode){
-    const HSTART = HOUR_RANGE[mode][0], HEND = HOUR_RANGE[mode][1];
+    const [HSTART, HEND] = HOUR_RANGE[mode];
 
     const container = document.createElement('div');
     container.className = 'matrix-wrap';
@@ -349,26 +324,14 @@
         }
 
         const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
-        const avg  = (obj.wind_avg_kn == null ? '' : `${obj.wind_avg_kn} kn`);
+        const avg  = (obj.wind_avg_kn == null ? '' : `, avg ${obj.wind_avg_kn} kn`);
         const deg  = obj.dir_deg;
         const dirs = ['N','NE','E','SE','S','SW','W','NW'];
         const card = (deg==null) ? '' : dirs[Math.round(((deg%360)/45)) % 8];
+        const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
 
-        const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg?`, avg ${avg}`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
-
-        // visual and accessibility
-        td.innerHTML = `<div class="cell" title="${tip}" tabindex="0" role="button"
-            data-spot="${spotKey}"
-            data-day="${dk}"
-            data-hour="${hrStr}"
-            data-gust="${gust}"
-            data-avg="${obj.wind_avg_kn==null?'':obj.wind_avg_kn}"
-            data-deg="${deg==null?'':deg}"
-            data-card="${card}"
-            data-tide="${tideState}"
-          >${deg!=null ? arrowSVG(deg) : ''}</div>`;
+        td.innerHTML = `<div class="cell" title="${tip}">${deg!=null ? arrowSVG(deg) : ''}</div>`;
         td.querySelector('.cell').style.background = bg;
-
         tr.appendChild(td);
       });
 
@@ -383,13 +346,13 @@
   function render(mode){
     matrices.innerHTML = '';
     const views = {};
-    const spotList = [
+    const spots = [
       {key:'beauport',     label:'Baie de Beauport'},
       {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
       {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
       {key:'ange_gardien', label:'Ange-Gardien'},
     ];
-    spotList.forEach((s,i)=>{
+    spots.forEach((s,i)=>{
       const v = buildMatrix(s.key, mode);
       v.style.display = i===0 ? 'block':'none';
       v.id = 'view-'+s.key;
@@ -406,58 +369,8 @@
       const target = btn.dataset.target;
       Object.values(views).forEach(v=>v.style.display='none');
       views[target].style.display = 'block';
-      // Clear info bar when switching spots
-      infoBar.innerHTML = '<span class="info-dim">Tap a cell</span>';
     };
-
-    // Cell click / keyboard support — event delegation per matrix container
-    Object.values(views).forEach(view=>{
-      view.addEventListener('click', onCellActivate);
-      view.addEventListener('keydown', (ev)=>{
-        if(ev.key==='Enter' || ev.key===' '){
-          const el = ev.target.closest('.cell');
-          if(el){ ev.preventDefault(); onCellActivate(ev); }
-        }
-      });
-    });
   }
-
-  // Update sticky info bar from a cell dataset
-  function onCellActivate(ev){
-    const cell = ev.target.closest('.cell');
-    if(!cell) return;
-    const dk = cell.dataset.day;
-    const hr = cell.dataset.hour;
-    const gust = cell.dataset.gust || '-';
-    const avg  = cell.dataset.avg ? `${cell.dataset.avg} kn` : '';
-    const deg  = cell.dataset.deg;
-    const card = cell.dataset.card || '';
-    const tide = (cell.dataset.tide || 'unknown');
-    const arrow = (deg ? arrowSVG(deg,18) : '');
-
-    infoBar.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div><b>${dk}</b> ${hr}:00</div>
-        <div>• Gust: <b>${gust} kn</b>${avg?` (avg ${avg})`:''}</div>
-        <div>• Dir: <b>${card}${deg?` ${deg}°`:''}</b> ${arrow}</div>
-        <div>• Tide: <b>${tide}</b></div>
-      </div>`;
-  }
-
-  // Build tabs initially
-  const spots = [
-    {key:'beauport',     label:'Baie de Beauport'},
-    {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-    {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-    {key:'ange_gardien', label:'Ange-Gardien'},
-  ];
-  spots.forEach((s,i)=>{
-    const tab = document.createElement('button');
-    tab.className = 'tab' + (i===0?' active':'');
-    tab.textContent = s.label;
-    tab.dataset.target = s.key;
-    document.getElementById('tabs').appendChild(tab);
-  });
 
   // Initial render
   render(VIEW);

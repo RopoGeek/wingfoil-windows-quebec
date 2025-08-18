@@ -123,7 +123,7 @@
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
 
-  /* Legend color helpers (class-based to render reliably on iOS) */
+  /* Legend with reliable color boxes (iOS-safe) */
   .legend{margin:6px 0 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px}
   .swatch{display:inline-block; min-width:16px; width:16px; height:12px; border:1px solid #bbb; vertical-align:middle}
   .c-g1{background:var(--g1)} .c-g2{background:var(--g2)}
@@ -319,19 +319,6 @@
     return 'var(--tide-unk)'; // unknown -> transparent
   }
 
-  // Group rows by day
-  const byDayAll = new Map();
-  for(const row of hours){
-    const t = toLocal(row.time);
-    const k = dayKey(t);
-    if(!byDayAll.has(k)) byDayAll.set(k, []);
-    byDayAll.get(k).push(row);
-  }
-  for(const arr of byDayAll.values()){
-    arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
-  }
-  const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
-
   // ---------- Per-spot settings (saved per spot in localStorage) ----------
   const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // 8..25 inclusive
   const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -491,6 +478,17 @@
     arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
+
+  function strengthColor(kn){
+    if (kn == null || isNaN(kn)) return 'var(--neutral)';
+    const v = Number(kn);
+    if (v >= 30) return 'var(--r2)';
+    if (v >= 25) return 'var(--r1)';
+    if (v >= 21) return 'var(--y2)';
+    if (v >= 18) return 'var(--y1)';
+    if (v >= 14) return 'var(--g2)';
+    return 'var(--g1)';
+  }
 
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);

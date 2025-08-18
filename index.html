@@ -191,8 +191,8 @@
   </div>
 </details>
 
-<!-- Collapsible: Spot conditions -->
-<details class="collapsible" open>
+<!-- Collapsible: Spot conditions (NOW COLLAPSED BY DEFAULT) -->
+<details class="collapsible">
   <summary>Conditions par site / Spot Conditions</summary>
   <div class="content">
     <ul>
@@ -302,7 +302,7 @@
   <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
 </div>
 
-<!-- Legend with reliable color boxes -->
+<!-- Legend -->
 <div class="legend">
   <span class="swatch c-g1"></span> <span class="lang-fr">10–14 nœuds</span> / <span class="lang-en">10–14 kn</span>
   <span class="swatch c-g2"></span> <span class="lang-fr">14–18 nœuds</span> / <span class="lang-en">14–18 kn</span>
@@ -668,6 +668,8 @@
     const matrices = document.getElementById('matrices');
     matrices.innerHTML = '';
     const views = {};
+    const tabBar = document.getElementById('tabs');
+
     spots.forEach((s,i)=>{
       const v = buildMatrix(s.key, mode);
       v.style.display = i===0 ? 'block':'none';

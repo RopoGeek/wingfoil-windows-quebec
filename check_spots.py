@@ -11,7 +11,7 @@ from collections import Counter
 # ----- CONFIG -----
 TZ = ZoneInfo("America/Toronto")
 NOW = dt.datetime.now(TZ).replace(minute=0, second=0, microsecond=0)
-HOURS = 96  # forecast horizon (hours)
+HOURS = 168  # forecast horizon (hours) -> 7 days
 
 SPOTS = {
     "beauport":     {"name": "Baie de Beauport",             "lat": 46.8598,    "lon": -71.2006},

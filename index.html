@@ -3,6 +3,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Wingfoil Windows – Québec Area</title>
+<!-- Optional: auto refresh every 30 minutes. Change 1800 to 3600 for 1 hour -->
+<meta http-equiv="refresh" content="1800" />
+
 <style>
   :root{
     /* cell colors */
@@ -35,6 +38,11 @@
 
     /* language styling */
     --en-color:#505050;
+
+    /* collapsibles */
+    --collp-bg:#fafafa;
+    --collp-border:#e6e6e6;
+    --collp-summary:#222;
   }
 
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
@@ -47,23 +55,20 @@
   .lang-fr{font-family:system-ui,Segoe UI,Arial}
   .lang-en{font-family:ui-serif,Georgia,"Times New Roman",serif;color:var(--en-color)}
 
-  /* Rules block (top, bilingual) */
-  .rules-block {
-    margin: 16px 0 8px;
-    font-size: 15px;
-    line-height: 1.45;
-    background: #fafafa;
-    border: 1px solid #e6e6e6;
-    border-radius: 10px;
-    padding: 12px 14px;
+  /* Collapsible sections */
+  .collapsible{border:1px solid var(--collp-border); border-radius:10px; background:var(--collp-bg); margin:10px 0}
+  .collapsible summary{
+    cursor:pointer; list-style:none; padding:10px 12px; font-weight:600; color:var(--collp-summary);
+    display:flex; align-items:center; gap:8px; user-select:none;
   }
-  .rules-block h2 { font-size: 18px; margin: 0 0 8px; }
-  .rules-cols{ display:grid; grid-template-columns: 1fr; gap: 12px; }
-  @media (min-width: 900px){ .rules-cols{ grid-template-columns: 1fr 1fr; } }
-  .rules-block ul { margin: 0 0 6px 20px; padding: 0; }
-  .rules-block li { margin-bottom: 6px; }
-  .rules-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
-  .rules-subtitle{ font-weight:600; margin: 8px 0 6px; }
+  .collapsible summary::before{
+    content:"+"; width:18px; height:18px; display:inline-grid; place-items:center;
+    border:1px solid #ccc; border-radius:4px; font-weight:700; background:#fff;
+  }
+  .collapsible[open] summary::before{ content:"–"; }
+  .collapsible .content{ padding:10px 12px 12px; font-size:14px; line-height:1.5 }
+  .collapsible ul{ margin:6px 0 6px 20px; }
+  .collapsible li{ margin:6px 0; }
 
   .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .tabs{display:flex;gap:8px;margin:10px 0}
@@ -138,86 +143,121 @@
   .c-y1{background:var(--y1)} .c-y2{background:var(--y2)}
   .c-r1{background:var(--r1)} .c-r2{background:var(--r2)}
   .c-neutral{background:var(--neutral)} .c-blank{background:var(--blank)}
+
+  /* Link styling inside notes */
+  a{ color:#0a5; text-decoration:underline; }
 </style>
 
 <header>
   <h1>Wingfoil Windows – Québec Area</h1>
-  <div class="intro">
-  <p class="fr">
-    Ce site a pour but de donner une idée générale des moments intéressants 
-    pour la pratique du wingfoil dans la semaine à venir, selon des préférences personnelles 
-    de vent, direction et marée. Pour une consultation détaillée et des données plus précises, 
-    il est fortement recommandé de visiter des sites spécialisés comme 
-    <a href="https://asvq.ca" target="_blank">asvq.ca</a> ou d’utiliser des applications 
-    reconnues telles que <a href="https://windy.app" target="_blank">Windy.app</a>, 
-    <a href="https://www.windfinder.com" target="_blank">Windfinder</a
-
   <span class="pill">Heure locale / Local time (America/Toronto)</span>
 </header>
 
-<!-- Bilingual rules + tides notes at the top (FR first) -->
-<div class="rules-block">
-  <h2>Conditions par site / Spot Conditions</h2>
-  <div class="rules-cols">
-    <div>
-      <ul>
-        <li>
-          <span class="lang-fr"><b>Baie de Beauport</b> — par défaut : rafales ≥10 nœuds, toute direction</span><br/>
-          <span class="lang-en"><b>Baie de Beauport</b> — default: gust ≥10 kn, any direction</span>
-        </li>
-        <li>
-          <span class="lang-fr"><b>Ste-Anne-de-Beaupré</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
-          <span class="lang-en"><b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
-        </li>
-        <li>
-          <span class="lang-fr"><b>St-Jean, Île d’Orléans</b> — par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</span><br/>
-          <span class="lang-en"><b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn</span>
-        </li>
-        <li>
-          <span class="lang-fr"><b>Ange-Gardien</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
-          <span class="lang-en"><b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
-        </li>
-      </ul>
+<!-- Collapsible: Introduction -->
+<details class="collapsible">
+  <summary>Introduction</summary>
+  <div class="content">
+    <p class="lang-fr">
+      Ce site donne une <b>vision générale</b> des <b>moments intéressants</b> pour pratiquer le wingfoil 
+      au cours de la prochaine semaine, en fonction de <b>préférences personnelles</b> (rafale minimale, secteurs de vent, marée).
+      Les données et la coloration ne sont pas une garantie des conditions réelles sur l’eau.
+      Pour une <b>consultation détaillée</b> et des données plus précises, utilisez des ressources dédiées au Québec :
+      <a href="https://asvq.ca" target="_blank" rel="noopener">asvq.ca</a>,
+      des applications de vent populaires comme 
+      <a href="https://windy.app" target="_blank" rel="noopener">Windy.app</a>,
+      <a href="https://www.windfinder.com" target="_blank" rel="noopener">Windfinder</a>,
+      <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>
+      et les prévisions d’<a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environnement Canada (Marine)</a>.
+    </p>
+    <p class="lang-en">
+      This site provides a <b>high-level overview</b> of <b>promising windows</b> for wingfoiling
+      over the coming week, based on your <b>personal filters</b> (min gust, wind sectors, tide).
+      Colors are indicative only and are not a guarantee of on-water conditions.
+      For <b>detailed forecasts</b>, use dedicated Quebec resources like 
+      <a href="https://asvq.ca" target="_blank" rel="noopener">asvq.ca</a> and popular wind apps:
+      <a href="https://windy.app" target="_blank" rel="noopener">Windy.app</a>,
+      <a href="https://www.windfinder.com" target="_blank" rel="noopener">Windfinder</a>,
+      <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>,
+      plus <a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environment Canada Marine forecasts</a>.
+    </p>
 
-      <p class="rules-note">
-        <span class="lang-fr">Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</span><br/>
-        <span class="lang-en">Arrows point <b>from</b> the wind’s source (mean wind direction).</span>
-      </p>
-    </div>
-
-    <div>
-      <div class="rules-subtitle">Marées / Tides</div>
-      <p class="rules-note">
-        <span class="lang-fr">La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale). Ces phases sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins. Pour des horaires précis, consultez les stations officielles ci-dessous.</span><br/>
-        <span class="lang-en">The thin colored stripe beside each day shows the tide phase for that spot (green = rising, red = falling, grey = slack). These phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets for nearby spots. For precise timing, use the official stations below.</span>
-      </p>
-      <ul class="rules-note" style="margin-left:18px">
-        <li>
-          <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">
-            <span class="lang-fr">Baie de Beauport — Station officielle 03250</span>
-            <span class="lang-en">Baie de Beauport — Official station 03250</span>
-          </a>
-        </li>
-        <li>
-          <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">
-            <span class="lang-fr">Ste-Anne-de-Beaupré — Station officielle 03087</span>
-            <span class="lang-en">Ste-Anne-de-Beaupré — Official station 03087</span>
-          </a>
-        </li>
-        <li>
-          <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">
-            <span class="lang-fr">St-Jean, Île d’Orléans — Station officielle 03105</span>
-            <span class="lang-en">St-Jean, Île d’Orléans — Official station 03105</span>
-          </a>
-        </li>
-      </ul>
-      <p class="rules-note">
-        <span class="lang-fr">Ange-Gardien : pas de station dédiée. Pour une estimation rapide, utilisez une heure environ à mi-chemin entre les changements de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.</span><br/>
-        <span class="lang-en">Ange-Gardien: no dedicated station. For a rough idea, take a time roughly mid-way between tide changes at Ste-Anne-de-Beaupré and Baie de Beauport.</span>
-      </p>
-    </div>
+    <p class="lang-fr">
+      <b>Modèles de vent utilisés :</b> les données proviennent d’Open-Meteo (sélection automatique selon la zone),
+      et ce site applique vos règles pour mettre en évidence les cases.
+      Les modèles couramment consultés pour notre région incluent <b>HRDPS</b> (résolution fine),
+      <b>NAM</b> et <b>HRRR</b>; comparez-les dans vos applications préférées.
+    </p>
+    <p class="lang-en">
+      <b>Wind models shown:</b> data is pulled via Open-Meteo (auto model selection for the area),
+      and the site applies your rules to highlight cells. For the Quebec region, people often compare
+      <b>HRDPS</b> (high-resolution), <b>NAM</b>, and <b>HRRR</b> in their favorite apps.
+    </p>
   </div>
-</div>
+</details>
+
+<!-- Collapsible: Spot conditions -->
+<details class="collapsible">
+  <summary>Conditions par site / Spot Conditions</summary>
+  <div class="content">
+    <ul>
+      <li>
+        <span class="lang-fr"><b>Baie de Beauport</b> — par défaut : rafales ≥10 nœuds, toute direction</span><br/>
+        <span class="lang-en"><b>Baie de Beauport</b> — default: gust ≥10 kn, any direction</span>
+      </li>
+      <li>
+        <span class="lang-fr"><b>Ste-Anne-de-Beaupré</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+        <span class="lang-en"><b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
+      </li>
+      <li>
+        <span class="lang-fr"><b>St-Jean, Île d’Orléans</b> — par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</span><br/>
+        <span class="lang-en"><b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn</span>
+      </li>
+      <li>
+        <span class="lang-fr"><b>Ange-Gardien</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+        <span class="lang-en"><b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
+      </li>
+    </ul>
+    <p class="muted">
+      <span class="lang-fr">Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</span><br/>
+      <span class="lang-en">Arrows point <b>from</b> the wind’s source (mean wind direction).</span>
+    </p>
+  </div>
+</details>
+
+<!-- Collapsible: Tides -->
+<details class="collapsible">
+  <summary>Marées / Tides</summary>
+  <div class="content">
+    <p class="muted">
+      <span class="lang-fr">La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale). Ces phases sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins. Pour des horaires précis, consultez les stations officielles ci-dessous.</span><br/>
+      <span class="lang-en">The thin colored stripe beside each day shows the tide phase for that spot (green = rising, red = falling, grey = slack). These phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets for nearby spots. For precise timing, use the official stations below.</span>
+    </p>
+    <ul class="muted">
+      <li>
+        <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">
+          <span class="lang-fr">Baie de Beauport — Station officielle 03250</span>
+          <span class="lang-en">Baie de Beauport — Official station 03250</span>
+        </a>
+      </li>
+      <li>
+        <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">
+          <span class="lang-fr">Ste-Anne-de-Beaupré — Station officielle 03087</span>
+          <span class="lang-en">Ste-Anne-de-Beaupré — Official station 03087</span>
+        </a>
+      </li>
+      <li>
+        <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">
+          <span class="lang-fr">St-Jean, Île d’Orléans — Station officielle 03105</span>
+          <span class="lang-en">St-Jean, Île d’Orléans — Official station 03105</span>
+        </a>
+      </li>
+    </ul>
+    <p class="muted">
+      <span class="lang-fr">Ange-Gardien : pas de station dédiée. Pour une estimation rapide, utilisez une heure environ à mi-chemin entre les changements de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.</span><br/>
+      <span class="lang-en">Ange-Gardien: no dedicated station. For a rough idea, use a time roughly midway between the tide changes at Ste-Anne-de-Beaupré and Baie de Beauport.</span>
+    </p>
+  </div>
+</details>
 
 <p class="muted">
   <span class="lang-fr">Basculer entre <b>Jour (06–21)</b> et <b>24h (00–23)</b>. Les colonnes = jours, les lignes = heures. Utilisez le panneau par site pour définir rafale min, directions permises et phase de marée. Vos préférences sont sauvegardées sur cet appareil.</span><br/>
@@ -525,6 +565,14 @@
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
+  function tideStripeColor(state){
+    const s = (state||'').toLowerCase();
+    if (s==='rising')  return 'var(--tide-rise)';
+    if (s==='falling') return 'var(--tide-fall)';
+    if (s==='slack')   return 'var(--tide-slack)';
+    return 'var(--tide-unk)';
+  }
+
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
 
@@ -603,18 +651,17 @@
         }
 
         const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
-        const avg  = (obj.wind_avg_kn == null ? '' : `${obj.wind_avg_kn} kn`);
+        const avg  = obj.wind_avg_kn;
         const deg  = obj.dir_deg;
         const card = deg==null ? '' : degToCardinal16(deg);
-
-        const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg?`, avg ${avg}`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
+        const tip  = `${dk} ${hrStr}:00 — gust ${gust} kn${avg!=null?`, avg ${avg} kn`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
 
         td.innerHTML = `<div class="cell" title="${tip}" tabindex="0" role="button"
             data-spot="${spotKey}"
             data-day="${dk}"
             data-hour="${hrStr}"
             data-gust="${gust}"
-            data-avg="${obj.wind_avg_kn==null?'':obj.wind_avg_kn}"
+            data-avg="${avg==null?'':avg}"
             data-deg="${deg==null?'':deg}"
             data-card="${card}"
             data-tide="${tideState}"
@@ -643,7 +690,7 @@
       views[s.key] = v;
     });
 
-    // Tab switching (also switches the *active spot* for settings & saves)
+    // Tab switching (also sets active spot for settings)
     tabBar.onclick = (e)=>{
       const btn = e.target.closest('.tab');
       if(!btn) return;
@@ -657,7 +704,7 @@
       infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
     };
 
-    // Cell click / keyboard support — event delegation per matrix
+    // Cell click / keyboard support — event delegation
     Object.values(views).forEach(view=>{
       view.addEventListener('click', onCellActivate);
       view.addEventListener('keydown', (ev)=>{
@@ -669,7 +716,7 @@
     });
   }
 
-  // Update sticky info bar from a cell dataset
+  // Sticky info bar update from a cell
   function onCellActivate(ev){
     const cell = ev.target.closest('.cell');
     if(!cell) return;

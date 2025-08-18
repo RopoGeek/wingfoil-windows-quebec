@@ -27,6 +27,11 @@
     --tide-fall:#b00;   /* dark red for Falling */
     --tide-slack:#bbb;  /* light grey for Slack */
     --tide-unk:transparent;
+
+    /* UI */
+    --chip:#f5f5f5;
+    --chip-on:#ddf3e6;
+    --chip-border:#cfcfcf;
   }
 
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
@@ -58,24 +63,42 @@
   .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
   .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
 
-  .legend{display:flex;gap:10px;align-items:center;margin:6px 0 10px;flex-wrap:wrap}
-  .swatch{width:16px;height:12px;border:1px solid #bbb;display:inline-block;vertical-align:middle}
+  /* Settings panel */
+  .settings-wrap{
+    border:1px solid var(--grid-border);
+    border-radius:10px;
+    padding:10px;
+    margin:10px 0 14px;
+    background:#fff;
+  }
+  .settings-grid{
+    display:grid; gap:10px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width:900px){
+    .settings-grid{ grid-template-columns: 220px 1fr 220px; align-items:flex-start; }
+  }
+  .settings-section h3{ margin:0 0 6px; font-size:14px }
+  .select, .checkboxes{ font-size:14px }
+  select{ padding:6px 8px; border:1px solid #ccc; border-radius:8px; background:#fff; }
+  .dir-grid{
+    display:grid; grid-template-columns: repeat(8, minmax(56px,1fr)); gap:6px;
+  }
+  .chip{
+    user-select:none;
+    padding:6px 6px; border:1px solid var(--chip-border); border-radius:8px;
+    text-align:center; background:var(--chip); cursor:pointer; font-size:12px;
+  }
+  .chip.on{ background:var(--chip-on); border-color:#6ec099; }
+  .preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px }
+  .preset{ font-size:12px; background:#f0f6ff; border:1px solid #bcd3ff; border-radius:999px; padding:4px 8px; cursor:pointer }
 
   /* Sticky info bar for tap/focus */
   .info-bar{
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:8px 10px;
-    border:1px solid var(--grid-border);
-    border-radius:10px;
-    background:#fffffe;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
-    font-size:14px;
-    min-height:36px;
+    position: sticky; top: 0; z-index: 5;
+    display:flex; align-items:center; gap:10px;
+    padding:8px 10px; border:1px solid var(--grid-border); border-radius:10px;
+    background:#fffffe; box-shadow: 0 1px 0 rgba(0,0,0,0.02); font-size:14px; min-height:36px;
   }
   .info-bar .arrow{width:18px;height:18px}
   .info-dim{color:var(--muted)}
@@ -113,20 +136,20 @@
     <div>
       <ul>
         <li>
-          <b>Baie de Beauport</b> — Gust ≥10 kn, any wind direction<br/>
-          <i>Rafales ≥10 nœuds, toute direction de vent</i>
+          <b>Baie de Beauport</b> — default: Gust ≥10 kn, any direction<br/>
+          <i>Par défaut : Rafales ≥10 nœuds, toute direction</i>
         </li>
         <li>
-          <b>Ste-Anne-de-Beaupré</b> — SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
-          <i>SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
+          <b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
+          <i>Par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
         </li>
         <li>
-          <b>St-Jean, Île d’Orléans</b> — NE 30–70°, <b>falling</b> tide, gust ≥10 kn<br/>
-          <i>NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</i>
+          <b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn<br/>
+          <i>Par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</i>
         </li>
         <li>
-          <b>Ange-Gardien</b> — SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
-          <i>SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
+          <b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
+          <i>Par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
         </li>
       </ul>
     </div>
@@ -144,8 +167,8 @@
 </div>
 
 <p class="muted">
-  Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Days are columns, hours are rows.
-  Cells are colored by <b>gust strength</b> only when the spot’s rules are met.
+  Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Days = columns, hours = rows.<br/>
+  Use the per-spot panel to customize minimum gust, allowed directions, and tide phase. Your preferences are saved on this device.
 </p>
 
 <div class="controls">
@@ -153,6 +176,38 @@
   <div class="viewtoggles">
     <button class="toggle active" id="tgl-daylight">Daylight</button>
     <button class="toggle" id="tgl-all">All hours</button>
+  </div>
+</div>
+
+<!-- Per-spot settings -->
+<div class="settings-wrap" id="settingsWrap">
+  <div class="settings-grid">
+    <div class="settings-section">
+      <h3>Minimum gust (kn) / Rafale min (nœuds)</h3>
+      <select id="minGustSelect"></select>
+    </div>
+
+    <div class="settings-section">
+      <h3>Allowed directions / Directions permises</h3>
+      <div class="dir-grid" id="dirGrid"></div>
+      <div class="preset-row">
+        <span class="preset" data-preset="any">Any / Toutes</span>
+        <span class="preset" data-preset="sw">SW 200–250°</span>
+        <span class="preset" data-preset="ne">NE 30–70°</span>
+        <span class="preset" data-preset="none">Clear / Effacer</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Tide / Marée</h3>
+      <div class="checkboxes">
+        <label><input type="checkbox" id="tideRise"> Rising / Montante</label><br/>
+        <label><input type="checkbox" id="tideFall"> Falling / Descendante</label>
+      </div>
+      <p class="muted" style="margin-top:6px">
+        If both are off, tide is ignored. If both are on, either phase is allowed.
+      </p>
+    </div>
   </div>
 </div>
 
@@ -181,7 +236,7 @@
   let VIEW = 'daylight'; // 'daylight' | 'all'
   const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
 
-  // Spots (single definition!)
+  // Spots
   const spots = [
     {key:'beauport',     label:'Baie de Beauport'},
     {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
@@ -189,7 +244,7 @@
     {key:'ange_gardien', label:'Ange-Gardien'},
   ];
 
-  // Build tabs once
+  // Build tabs
   const tabBar = document.getElementById('tabs');
   spots.forEach((s,i)=>{
     const tab = document.createElement('button');
@@ -199,7 +254,7 @@
     tabBar.appendChild(tab);
   });
 
-  // Load data (cache-busted)
+  // Load data
   let data;
   try{
     data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
@@ -225,14 +280,13 @@
 
   function degToCardinal(deg){
     if (deg==null || isNaN(deg)) return '';
-    const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-    const ix = Math.round(((deg%360)/45)) % 8;
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    const ix = Math.round(((deg%360)/22.5)) % 16;
     return dirs[ix];
   }
-  // Arrow shows "from" direction; rotate an up arrow by (180 + deg).
   function arrowSVG(deg, size=12){
     if (deg==null || isNaN(deg)) return '';
-    const rot = (180 + Number(deg)) % 360;
+    const rot = (180 + Number(deg)) % 360; // show FROM
     return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg);width:${size}px;height:${size}px">
       <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
     </svg>`;
@@ -248,7 +302,6 @@
     if (v >= 14) return 'var(--g2)';
     return 'var(--g1)'; // 10–14
   }
-
   function tideStripeColor(state){
     const s = (state||'').toLowerCase();
     if (s==='rising')  return 'var(--tide-rise)';
@@ -257,7 +310,7 @@
     return 'var(--tide-unk)'; // unknown -> transparent
   }
 
-  // Group ALL rows by day
+  // Group rows by day
   const byDayAll = new Map();
   for(const row of hours){
     const t = toLocal(row.time);
@@ -269,6 +322,161 @@
     arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
+
+  // ---------- Per-spot settings UI ----------
+  const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // 8..25 inclusive
+
+  // 16 sectors, center angle and range (±11.25°)
+  const SECTORS = [
+    'N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'
+  ];
+  function sectorOf(deg){
+    if (deg==null || isNaN(deg)) return null;
+    const i = Math.round(((deg%360)/22.5)) % 16;
+    return SECTORS[i];
+  }
+
+  const defaultSettings = {
+    beauport:     { min:10, dirs: new Set(SECTORS), tides: new Set(['rising','falling']) },
+    ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']), tides: new Set(['rising']) },
+    st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']), tides: new Set(['falling']) },
+    ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']), tides: new Set(['rising']) },
+  };
+
+  // Load/save per-spot settings in localStorage
+  function loadSettings(spotKey){
+    const raw = localStorage.getItem('wf_settings_'+spotKey);
+    if(!raw) return structuredClone(defaultSettings[spotKey]);
+    try{
+      const o = JSON.parse(raw);
+      return {
+        min: o.min ?? defaultSettings[spotKey].min,
+        dirs: new Set(o.dirs ?? Array.from(defaultSettings[spotKey].dirs)),
+        tides: new Set(o.tides ?? Array.from(defaultSettings[spotKey].tides)),
+      };
+    }catch(_){ return structuredClone(defaultSettings[spotKey]); }
+  }
+  function saveSettings(spotKey, s){
+    localStorage.setItem('wf_settings_'+spotKey, JSON.stringify({
+      min: s.min, dirs: Array.from(s.dirs), tides: Array.from(s.tides)
+    }));
+  }
+
+  // Current spot + its settings
+  let currentSpot = 'beauport';
+  let settings = { beauport:loadSettings('beauport'),
+                   ste_anne:loadSettings('ste_anne'),
+                   st_jean:loadSettings('st_jean'),
+                   ange_gardien:loadSettings('ange_gardien') };
+
+  // Build settings panel controls
+  const gustSel = document.getElementById('minGustSelect');
+  MIN_KN_OPTIONS.forEach(v=>{
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v + ' kn';
+    gustSel.appendChild(opt);
+  });
+  const dirGrid = document.getElementById('dirGrid');
+  SECTORS.forEach(sec=>{
+    const div = document.createElement('div');
+    div.className = 'chip';
+    div.textContent = sec;
+    div.dataset.sec = sec;
+    dirGrid.appendChild(div);
+  });
+  const tideRise = document.getElementById('tideRise');
+  const tideFall = document.getElementById('tideFall');
+
+  function refreshSettingsPanel(){
+    const s = settings[currentSpot];
+    gustSel.value = s.min;
+    // update chips
+    [...dirGrid.children].forEach(ch=>{
+      ch.classList.toggle('on', s.dirs.has(ch.dataset.sec));
+    });
+    tideRise.checked = s.tides.has('rising');
+    tideFall.checked = s.tides.has('falling');
+  }
+
+  // Interactions: directions chips
+  dirGrid.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    const s = settings[currentSpot];
+    const sec = chip.dataset.sec;
+    if(s.dirs.has(sec)) s.dirs.delete(sec); else s.dirs.add(sec);
+    chip.classList.toggle('on');
+    saveSettings(currentSpot, s);
+    render(VIEW);
+  });
+
+  // Presets
+  document.querySelectorAll('.preset').forEach(p=>{
+    p.addEventListener('click', ()=>{
+      const which = p.dataset.preset;
+      const s = settings[currentSpot];
+      if(which==='any'){
+        s.dirs = new Set(SECTORS);
+      }else if(which==='sw'){
+        s.dirs = new Set(['SSW','SW','WSW']);
+      }else if(which==='ne'){
+        s.dirs = new Set(['NNE','NE','ENE']);
+      }else if(which==='none'){
+        s.dirs = new Set();
+      }
+      saveSettings(currentSpot, s);
+      refreshSettingsPanel();
+      render(VIEW);
+    });
+  });
+
+  // Gust select
+  gustSel.addEventListener('change', ()=>{
+    const s = settings[currentSpot];
+    s.min = Number(gustSel.value);
+    saveSettings(currentSpot, s);
+    render(VIEW);
+  });
+
+  // Tide checkboxes
+  tideRise.addEventListener('change', ()=>{
+    const s = settings[currentSpot];
+    if(tideRise.checked) s.tides.add('rising'); else s.tides.delete('rising');
+    saveSettings(currentSpot, s);
+    render(VIEW);
+  });
+  tideFall.addEventListener('change', ()=>{
+    const s = settings[currentSpot];
+    if(tideFall.checked) s.tides.add('falling'); else s.tides.delete('falling');
+    saveSettings(currentSpot, s);
+    render(VIEW);
+  });
+
+  // ---------- Table building ----------
+  function meetsUserRules(spotKey, gust, dir_deg, tide){
+    const s = settings[spotKey];
+    // 1) gust
+    if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;
+
+    // 2) direction: if none selected -> treat as ANY (or if you prefer, block; we choose ANY)
+    if (dir_deg != null && !isNaN(dir_deg)) {
+      const sec = sectorOf(Number(dir_deg));
+      if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;
+    } else {
+      // No direction data -> fail direction test
+      return false;
+    }
+
+    // 3) tide: if no boxes checked, ignore tide; else require match
+    const t = String(tide||'unknown').toLowerCase();
+    if (s.tides.size === 0) {
+      // ignoring tide filter
+    } else {
+      if (!s.tides.has(t)) return false;
+    }
+
+    return true;
+  }
 
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
@@ -337,12 +545,11 @@
 
         // data cell
         const td = document.createElement('td');
-        const go = obj && obj.go ? !!obj.go[spotKey] : false;  // THIS spot’s go flag
 
         let bg;
         if (obj.wind_kn == null) {
           bg = 'var(--neutral)';           // missing data
-        } else if (go) {
+        } else if (meetsUserRules(spotKey, obj.wind_kn, obj.dir_deg, tideState)) {
           bg = strengthColor(obj.wind_kn); // meets criteria -> color by gust strength
         } else {
           bg = 'var(--blank)';             // criteria not met -> blank
@@ -398,6 +605,8 @@
       const target = btn.dataset.target;
       Object.values(views).forEach(v=>v.style.display='none');
       views[target].style.display = 'block';
+      currentSpot = target;
+      refreshSettingsPanel();
       infoBar.innerHTML = '<span class="info-dim">Tap a cell</span>';
     };
 
@@ -435,7 +644,8 @@
       </div>`;
   }
 
-  // Initial render
+  // Initialize
+  refreshSettingsPanel();
   render(VIEW);
 
   // Toggle listeners

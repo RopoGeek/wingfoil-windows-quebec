@@ -122,6 +122,14 @@
   .hour-label{padding:0 6px;font-size:12px;color:#555}
   /* arrow */
   .arrow{width:12px;height:12px;opacity:0.9}
+
+  /* Legend color helpers (class-based to render reliably on iOS) */
+  .legend{margin:6px 0 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px}
+  .swatch{display:inline-block; min-width:16px; width:16px; height:12px; border:1px solid #bbb; vertical-align:middle}
+  .c-g1{background:var(--g1)} .c-g2{background:var(--g2)}
+  .c-y1{background:var(--y1)} .c-y2{background:var(--y2)}
+  .c-r1{background:var(--r1)} .c-r2{background:var(--r2)}
+  .c-neutral{background:var(--neutral)} .c-blank{background:var(--blank)}
 </style>
 
 <header>
@@ -216,16 +224,17 @@
   <span class="info-dim">Tap a cell</span>
 </div>
 
+<!-- Legend with reliable color boxes -->
 <div class="legend">
-  <span class="swatch" style="background:var(--g1)"></span> 10–14 kn
-  <span class="swatch" style="background:var(--g2)"></span> 14–18 kn
-  <span class="swatch" style="background:var(--y1)"></span> 18–21 kn
-  <span class="swatch" style="background:var(--y2)"></span> 21–25 kn
-  <span class="swatch" style="background:var(--r1)"></span> 25–30 kn
-  <span class="swatch" style="background:var(--r2)"></span> ≥30 kn
+  <span class="swatch c-g1"></span> 10–14 kn
+  <span class="swatch c-g2"></span> 14–18 kn
+  <span class="swatch c-y1"></span> 18–21 kn
+  <span class="swatch c-y2"></span> 21–25 kn
+  <span class="swatch c-r1"></span> 25–30 kn
+  <span class="swatch c-r2"></span> ≥30 kn
   &nbsp; | &nbsp;
-  <span class="swatch" style="background:var(--neutral)"></span> Missing data / Données manquantes
-  <span class="swatch" style="background:var(--blank)"></span> Criteria not met / Critères non remplis
+  <span class="swatch c-neutral"></span> Missing data / Données manquantes
+  <span class="swatch c-blank"></span> Criteria not met / Critères non remplis
 </div>
 
 <div id="matrices"></div>
@@ -278,7 +287,7 @@
   const dayLabel = d => d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
   const hourStr = d => d.toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:'America/Toronto' });
 
-  function degToCardinal(deg){
+  function degToCardinal16(deg){
     if (deg==null || isNaN(deg)) return '';
     const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
     const ix = Math.round(((deg%360)/22.5)) % 16;
@@ -323,13 +332,10 @@
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
-  // ---------- Per-spot settings UI ----------
+  // ---------- Per-spot settings (saved per spot in localStorage) ----------
   const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // 8..25 inclusive
+  const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 
-  // 16 sectors, center angle and range (±11.25°)
-  const SECTORS = [
-    'N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'
-  ];
   function sectorOf(deg){
     if (deg==null || isNaN(deg)) return null;
     const i = Math.round(((deg%360)/22.5)) % 16;
@@ -337,13 +343,12 @@
   }
 
   const defaultSettings = {
-    beauport:     { min:10, dirs: new Set(SECTORS), tides: new Set(['rising','falling']) },
-    ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']), tides: new Set(['rising']) },
-    st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']), tides: new Set(['falling']) },
-    ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']), tides: new Set(['rising']) },
+    beauport:     { min:10, dirs: new Set(SECTORS),                tides: new Set(['rising','falling']) },
+    ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
+    st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']),     tides: new Set(['falling']) },
+    ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
   };
 
-  // Load/save per-spot settings in localStorage
   function loadSettings(spotKey){
     const raw = localStorage.getItem('wf_settings_'+spotKey);
     if(!raw) return structuredClone(defaultSettings[spotKey]);
@@ -362,12 +367,13 @@
     }));
   }
 
-  // Current spot + its settings
   let currentSpot = 'beauport';
-  let settings = { beauport:loadSettings('beauport'),
-                   ste_anne:loadSettings('ste_anne'),
-                   st_jean:loadSettings('st_jean'),
-                   ange_gardien:loadSettings('ange_gardien') };
+  let settings = {
+    beauport:loadSettings('beauport'),
+    ste_anne:loadSettings('ste_anne'),
+    st_jean:loadSettings('st_jean'),
+    ange_gardien:loadSettings('ange_gardien')
+  };
 
   // Build settings panel controls
   const gustSel = document.getElementById('minGustSelect');
@@ -390,7 +396,6 @@
   function refreshSettingsPanel(){
     const s = settings[currentSpot];
     gustSel.value = s.min;
-    // update chips
     [...dirGrid.children].forEach(ch=>{
       ch.classList.toggle('on', s.dirs.has(ch.dataset.sec));
     });
@@ -452,31 +457,40 @@
     render(VIEW);
   });
 
-  // ---------- Table building ----------
+  // ---------- Table logic ----------
   function meetsUserRules(spotKey, gust, dir_deg, tide){
     const s = settings[spotKey];
-    // 1) gust
+    // gust
     if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;
-
-    // 2) direction: if none selected -> treat as ANY (or if you prefer, block; we choose ANY)
+    // direction (if none selected, treat as ANY)
     if (dir_deg != null && !isNaN(dir_deg)) {
       const sec = sectorOf(Number(dir_deg));
       if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;
     } else {
-      // No direction data -> fail direction test
       return false;
     }
-
-    // 3) tide: if no boxes checked, ignore tide; else require match
+    // tide filter
     const t = String(tide||'unknown').toLowerCase();
     if (s.tides.size === 0) {
-      // ignoring tide filter
+      // ignoring tide
     } else {
       if (!s.tides.has(t)) return false;
     }
-
     return true;
   }
+
+  // Group by day
+  const byDayAll = new Map();
+  for(const row of hours){
+    const t = toLocal(row.time);
+    const k = dayKey(t);
+    if(!byDayAll.has(k)) byDayAll.set(k, []);
+    byDayAll.get(k).push(row);
+  }
+  for(const arr of byDayAll.values()){
+    arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
+  }
+  const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
@@ -558,7 +572,7 @@
         const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
         const avg  = (obj.wind_avg_kn == null ? '' : `${obj.wind_avg_kn} kn`);
         const deg  = obj.dir_deg;
-        const card = deg==null ? '' : degToCardinal(deg);
+        const card = deg==null ? '' : degToCardinal16(deg);
 
         const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg?`, avg ${avg}`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
 
@@ -596,7 +610,7 @@
       views[s.key] = v;
     });
 
-    // Tab switching
+    // Tab switching (also switches the *active spot* for settings & saves)
     tabBar.onclick = (e)=>{
       const btn = e.target.closest('.tab');
       if(!btn) return;
@@ -644,7 +658,7 @@
       </div>`;
   }
 
-  // Initialize
+  // Init settings UI and first render
   refreshSettingsPanel();
   render(VIEW);
 

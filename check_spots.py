@@ -44,7 +44,7 @@ BASELINE_CANDIDATES = [
 # Tide classification tuning
 EPS_TIDE = 0.02             # meters; delta to call rising/falling vs slack
 MAX_T_MATCH_MIN = 150       # regular nearest fallback window
-EDGE_MAX_MINUTES = 720      # wide fallback (12h) for edge gaps like your chunk 1
+EDGE_MAX_MINUTES = 720      # wide fallback (12h) for early gaps
 
 # CHS-style phase offsets (minutes): rising uses LLW offset; falling uses HHW offset
 TIDE_PHASE_OFFSETS = {
@@ -60,10 +60,6 @@ def http_get_json(url, timeout=45):
 
 # ----- Wind (Open-Meteo) -----
 def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
-    """
-    Uses Open-Meteo /v1/forecast WITHOUT a models= parameter.
-    OM will pick the best available model(s) for the coordinates & window.
-    """
     base = "https://api.open-meteo.com/v1/forecast"
     qs = urllib.parse.urlencode({
         "latitude": lat,
@@ -78,10 +74,6 @@ def fetch_open_meteo_wind(lat, lon, start_dt, end_dt):
 
 # ----- SPINE water levels (batched) -----
 def spine_levels_batch(lat, lon, utc_list, chunk_size=36, pause=0.2, max_retries=2):
-    """
-    Fetch many instants via query ?lat=..&lon=..&t=..&t=.. (batched).
-    Returns map { instant_isoZ: waterLevel } from items with status=OK.
-    """
     out, n = {}, len(utc_list)
     for i in range(0, n, chunk_size):
         chunk = utc_list[i:i+chunk_size]
@@ -189,6 +181,21 @@ def apply_spot_tide_offsets(out_data: dict):
             spot["tide"] = shifted_state_local(t_local, offs["rising"], offs["falling"])
             row[spot_key] = spot
 
+# ----- Rule evaluation (used twice) -----
+def evaluate_go(spot_key: str, gust_kn, dir_deg, tide_state: str) -> bool:
+    thr = THRESHOLD_GUST[spot_key]
+    if gust_kn is None or gust_kn < thr: 
+        return False
+    if spot_key == "beauport":
+        return True  # any direction
+    if dir_deg is None:
+        return False
+    if spot_key in ("ste_anne", "ange_gardien"):
+        return in_SW(dir_deg) and tide_state == "rising"
+    if spot_key == "st_jean":
+        return in_NE(dir_deg) and tide_state == "falling"
+    return False
+
 # ----- MAIN -----
 def main():
     start_local = NOW
@@ -248,38 +255,26 @@ def main():
     else:
         print("[INFO] No suitable baseline from SPINE trials; tides will be 'unknown'", file=sys.stderr)
 
-    # 4) Build baseline (Beauport) tide trend per hour: exact lookup first,
-    #    then nearest (±150 min), then wide-edge fallback (±12h) for early gaps.
+    # 4) Build baseline (Beauport) tide trend per hour: exact lookup, then nearest (±150 min), then wide-edge (±12h)
     baseline_trend = {}
     if baseline_map:
         times, vals = build_sorted_series(baseline_map)
 
         def classify_pair_with_fallbacks(a_isoZ, b_isoZ):
-            # exact keys first
             v0 = baseline_map.get(a_isoZ)
             v1 = baseline_map.get(b_isoZ)
-
-            # fallback #1: regular nearest window
             if v0 is None or v1 is None:
                 t0 = dt.datetime.fromisoformat(a_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
                 t1 = dt.datetime.fromisoformat(b_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
-                if v0 is None:
-                    v0 = nearest_value(times, vals, t0, MAX_T_MATCH_MIN)
-                if v1 is None:
-                    v1 = nearest_value(times, vals, t1, MAX_T_MATCH_MIN)
-
-            # fallback #2: wide edge window, helps when first chunk was all missing
+                if v0 is None: v0 = nearest_value(times, vals, t0, MAX_T_MATCH_MIN)
+                if v1 is None: v1 = nearest_value(times, vals, t1, MAX_T_MATCH_MIN)
             if v0 is None or v1 is None:
                 t0 = dt.datetime.fromisoformat(a_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
                 t1 = dt.datetime.fromisoformat(b_isoZ.replace("Z","+00:00")).astimezone(dt.timezone.utc)
-                if v0 is None:
-                    v0 = nearest_value(times, vals, t0, EDGE_MAX_MINUTES)
-                if v1 is None:
-                    v1 = nearest_value(times, vals, t1, EDGE_MAX_MINUTES)
-
+                if v0 is None: v0 = nearest_value(times, vals, t0, EDGE_MAX_MINUTES)
+                if v1 is None: v1 = nearest_value(times, vals, t1, EDGE_MAX_MINUTES)
             if v0 is None or v1 is None:
                 return "unknown"
-
             dv = v1 - v0
             if dv > EPS_TIDE:  return "rising"
             if dv < -EPS_TIDE: return "falling"
@@ -290,7 +285,8 @@ def main():
     else:
         print("[INFO] Baseline map empty; tides will be 'unknown'", file=sys.stderr)
 
-    # 5) Compose hour rows (fill Beauport tide here)
+    # 5) Compose hour rows (fill Beauport tide here; other tides filled later)
+    rows = []
     for i, t_loc_iso in enumerate(timeline_local):
         row = {"time": t_loc_iso}
         utc_iso = utc_hours[i]
@@ -309,40 +305,41 @@ def main():
             if baseline_trend and key == "beauport":
                 tide_status = baseline_trend.get(utc_iso, "unknown")
 
-            # Go / No-go rules (gust-based)
-            thr = THRESHOLD_GUST[key]
-            if key == "beauport":
-                go_flag = (gust is not None and gust >= thr)
-            elif key == "ste_anne":
-                go_flag = (gust is not None and gust >= thr and d is not None and in_SW(d) and tide_status == "rising")
-            elif key == "st_jean":
-                go_flag = (gust is not None and gust >= thr and d is not None and in_NE(d) and tide_status == "falling")
-            elif key == "ange_gardien":
-                go_flag = (gust is not None and gust >= thr and d is not None and in_SW(d) and tide_status == "rising")
-            else:
-                go_flag = False
+            # TEMP go_flag (for Beauport only is final; for others we recompute after offsets)
+            go_flag = evaluate_go(key, gust, d, tide_status)
 
             row[key] = {
                 "wind_kn": round(gust, 1) if gust is not None else None,
                 "wind_avg_kn": round(avg, 1) if avg is not None else None,
                 "dir_deg": round(d) if d is not None else None,
                 "tide": tide_status,
-                "go": {
-                    "beauport":     go_flag if key=="beauport"     else None,
-                    "ste_anne":     go_flag if key=="ste_anne"     else None,
-                    "st_jean":      go_flag if key=="st_jean"      else None,
-                    "ange_gardien": go_flag if key=="ange_gardien" else None,
-                }
+                "go": {k: None for k in SPOTS.keys()}  # will fill below
             }
+            row[key]["go"][key] = go_flag
 
-        result["hours"].append(row)
+        rows.append(row)
+
+    result["hours"] = rows
 
     # 6) Apply CHS-style time offsets in LOCAL time to synthesize tides for the other spots
     apply_spot_tide_offsets(result)
 
-    # 7) Debug + metadata
-    def count_trend(rows, key):
-        return dict(Counter(r.get(key, {}).get("tide", "unknown") for r in rows))
+    # 7) RECOMPUTE go/no-go for ALL spots using the FINAL tide state in each row
+    for row in result["hours"]:
+        for key in SPOTS.keys():
+            spot = row.get(key, {})
+            gust = spot.get("wind_kn")
+            d    = spot.get("dir_deg")
+            tide = spot.get("tide", "unknown")
+            go   = evaluate_go(key, gust, d, tide)
+            # keep the same structure: only the spot's own flag is filled
+            spot["go"] = {k: None for k in SPOTS.keys()}
+            spot["go"][key] = go
+            row[key] = spot
+
+    # 8) Debug + metadata
+    def count_trend(rows_list, key):
+        return dict(Counter(r.get(key, {}).get("tide", "unknown") for r in rows_list))
     result["tide_baseline"] = {
         "lat": (baseline_latlon[0] if baseline_latlon else None),
         "lon": (baseline_latlon[1] if baseline_latlon else None),
@@ -351,11 +348,6 @@ def main():
         "note": "Non-Baseline tides are time-shifted from Beauport using local-time offsets.",
     }
     result["debug_counts"] = {k: count_trend(result["hours"], k) for k in SPOTS.keys()}
-    # How many baseline trend keys were filled vs unknown (useful for debugging)
-    result["baseline_trend_fill"] = {
-        "total_keys": len(utc_pairs),
-        "non_unknown": sum(1 for k,v in (baseline_trend or {}).items() if v != "unknown")
-    }
     result["wind_models"] = "Open-Meteo auto (no models= param)"
 
     with open("forecast.json", "w", encoding="utf-8") as f:

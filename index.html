@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Wingfoil Windows – Québec Area</title>
@@ -32,6 +32,9 @@
     --chip:#f5f5f5;
     --chip-on:#ddf3e6;
     --chip-border:#cfcfcf;
+
+    /* language styling */
+    --en-color:#505050;
   }
 
   body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text)}
@@ -39,6 +42,10 @@
   h1{font-size:22px;margin:0}
   .pill{border:1px solid #aaa;border-radius:999px;padding:2px 8px;font-size:12px;color:#444}
   .muted{color:var(--muted);font-size:13px}
+
+  /* language tone */
+  .lang-fr{font-family:system-ui,Segoe UI,Arial}
+  .lang-en{font-family:ui-serif,Georgia,"Times New Roman",serif;color:var(--en-color)}
 
   /* Rules block (top, bilingual) */
   .rules-block {
@@ -54,9 +61,9 @@
   .rules-cols{ display:grid; grid-template-columns: 1fr; gap: 12px; }
   @media (min-width: 900px){ .rules-cols{ grid-template-columns: 1fr 1fr; } }
   .rules-block ul { margin: 0 0 6px 20px; padding: 0; }
-  .rules-block li { margin-bottom: 4px; }
+  .rules-block li { margin-bottom: 6px; }
   .rules-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
-  .rules-subtitle{ font-weight:600; margin: 4px 0 6px; }
+  .rules-subtitle{ font-weight:600; margin: 8px 0 6px; }
 
   .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .tabs{display:flex;gap:8px;margin:10px 0}
@@ -135,83 +142,83 @@
 
 <header>
   <h1>Wingfoil Windows – Québec Area</h1>
-  <span class="pill">Local time (America/Toronto)</span>
+  <span class="pill">Heure locale / Local time (America/Toronto)</span>
 </header>
 
-<!-- Bilingual rules + tides notes at the top -->
+<!-- Bilingual rules + tides notes at the top (FR first) -->
 <div class="rules-block">
-  <h2>Spot Conditions / Conditions par site</h2>
+  <h2>Conditions par site / Spot Conditions</h2>
   <div class="rules-cols">
     <div>
       <ul>
         <li>
-          <b>Baie de Beauport</b> — default: Gust ≥10 kn, any direction<br/>
-          <i>Par défaut : Rafales ≥10 nœuds, toute direction</i>
+          <span class="lang-fr"><b>Baie de Beauport</b> — par défaut : rafales ≥10 nœuds, toute direction</span><br/>
+          <span class="lang-en"><b>Baie de Beauport</b> — default: gust ≥10 kn, any direction</span>
         </li>
         <li>
-          <b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
-          <i>Par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
+          <span class="lang-fr"><b>Ste-Anne-de-Beaupré</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
         </li>
         <li>
-          <b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn<br/>
-          <i>Par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</i>
+          <span class="lang-fr"><b>St-Jean, Île d’Orléans</b> — par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn</span>
         </li>
         <li>
-          <b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn<br/>
-          <i>Par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
+          <span class="lang-fr"><b>Ange-Gardien</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
         </li>
       </ul>
+
       <p class="rules-note">
-        Arrows point <b>from</b> the wind’s source (mean wind direction).<br/>
-        <i>Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</i>
+        <span class="lang-fr">Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</span><br/>
+        <span class="lang-en">Arrows point <b>from</b> the wind’s source (mean wind direction).</span>
       </p>
     </div>
 
     <div>
-      <div class="rules-subtitle">Tides / Marées</div>
+      <div class="rules-subtitle">Marées / Tides</div>
       <p class="rules-note">
-        The thin colored stripe beside each day indicates the tide phase for that spot (green = rising, red = falling, grey = slack).
-        These tide phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets applied to nearby spots.
-        For precise timing, consult the official tide stations below.
-      </p>
-      <p class="rules-note">
-        La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale).
-        Ces phases de marée sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins.
-        Pour des horaires précis, consultez les stations officielles ci-dessous.
+        <span class="lang-fr">La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale). Ces phases sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins. Pour des horaires précis, consultez les stations officielles ci-dessous.</span><br/>
+        <span class="lang-en">The thin colored stripe beside each day shows the tide phase for that spot (green = rising, red = falling, grey = slack). These phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets for nearby spots. For precise timing, use the official stations below.</span>
       </p>
       <ul class="rules-note" style="margin-left:18px">
         <li>
-          <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">Baie de Beauport – Official station 03250</a>
+          <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">
+            <span class="lang-fr">Baie de Beauport — Station officielle 03250</span>
+            <span class="lang-en">Baie de Beauport — Official station 03250</span>
+          </a>
         </li>
         <li>
-          <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">Ste-Anne-de-Beaupré – Official station 03087</a>
+          <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">
+            <span class="lang-fr">Ste-Anne-de-Beaupré — Station officielle 03087</span>
+            <span class="lang-en">Ste-Anne-de-Beaupré — Official station 03087</span>
+          </a>
         </li>
         <li>
-          <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">St-Jean, Île d’Orléans – Official station 03105</a>
+          <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">
+            <span class="lang-fr">St-Jean, Île d’Orléans — Station officielle 03105</span>
+            <span class="lang-en">St-Jean, Île d’Orléans — Official station 03105</span>
+          </a>
         </li>
       </ul>
       <p class="rules-note">
-        Ange-Gardien: there is no dedicated station. For a rough idea, use a time roughly mid-way between the tide change times at
-        Ste-Anne-de-Beaupré and Baie de Beauport.
-      </p>
-      <p class="rules-note">
-        Ange-Gardien : il n’y a pas de station dédiée. Pour une estimation rapide, utilisez une heure située environ à mi-chemin entre
-        les heures de changement de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.
+        <span class="lang-fr">Ange-Gardien : pas de station dédiée. Pour une estimation rapide, utilisez une heure environ à mi-chemin entre les changements de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.</span><br/>
+        <span class="lang-en">Ange-Gardien: no dedicated station. For a rough idea, take a time roughly mid-way between tide changes at Ste-Anne-de-Beaupré and Baie de Beauport.</span>
       </p>
     </div>
   </div>
 </div>
 
 <p class="muted">
-  Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Days = columns, hours = rows.<br/>
-  Use the per-spot panel to customize minimum gust, allowed directions, and tide phase. Your preferences are saved on this device.
+  <span class="lang-fr">Basculer entre <b>Jour (06–21)</b> et <b>24h (00–23)</b>. Les colonnes = jours, les lignes = heures. Utilisez le panneau par site pour définir rafale min, directions permises et phase de marée. Vos préférences sont sauvegardées sur cet appareil.</span><br/>
+  <span class="lang-en">Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Columns are days, rows are hours. Use the per-spot panel to set min gust, allowed directions, and tide phase. Your preferences are saved on this device.</span>
 </p>
 
 <div class="controls">
   <div class="tabs" id="tabs"></div>
   <div class="viewtoggles">
-    <button class="toggle active" id="tgl-daylight">Daylight</button>
-    <button class="toggle" id="tgl-all">All hours</button>
+    <button class="toggle active" id="tgl-daylight"><span class="lang-fr">Jour</span> / <span class="lang-en">Daylight</span></button>
+    <button class="toggle" id="tgl-all"><span class="lang-fr">24h</span> / <span class="lang-en">All hours</span></button>
   </div>
 </div>
 
@@ -219,29 +226,30 @@
 <div class="settings-wrap" id="settingsWrap">
   <div class="settings-grid">
     <div class="settings-section">
-      <h3>Minimum gust (kn) / Rafale min (nœuds)</h3>
+      <h3><span class="lang-fr">Rafale min (nœuds)</span> / <span class="lang-en">Minimum gust (kn)</span></h3>
       <select id="minGustSelect"></select>
     </div>
 
     <div class="settings-section">
-      <h3>Allowed directions / Directions permises</h3>
+      <h3><span class="lang-fr">Directions permises</span> / <span class="lang-en">Allowed directions</span></h3>
       <div class="dir-grid" id="dirGrid"></div>
       <div class="preset-row">
-        <span class="preset" data-preset="any">Any / Toutes</span>
+        <span class="preset" data-preset="any"><span class="lang-fr">Toutes</span> / <span class="lang-en">Any</span></span>
         <span class="preset" data-preset="sw">SW 200–250°</span>
         <span class="preset" data-preset="ne">NE 30–70°</span>
-        <span class="preset" data-preset="none">Clear / Effacer</span>
+        <span class="preset" data-preset="none"><span class="lang-fr">Effacer</span> / <span class="lang-en">Clear</span></span>
       </div>
     </div>
 
     <div class="settings-section">
-      <h3>Tide / Marée</h3>
+      <h3><span class="lang-fr">Marée</span> / <span class="lang-en">Tide</span></h3>
       <div class="checkboxes">
-        <label><input type="checkbox" id="tideRise"> Rising / Montante</label><br/>
-        <label><input type="checkbox" id="tideFall"> Falling / Descendante</label>
+        <label><input type="checkbox" id="tideRise"> <span class="lang-fr">Montante</span> / <span class="lang-en">Rising</span></label><br/>
+        <label><input type="checkbox" id="tideFall"> <span class="lang-fr">Descendante</span> / <span class="lang-en">Falling</span></label>
       </div>
       <p class="muted" style="margin-top:6px">
-        If both are off, tide is ignored. If both are on, either phase is allowed.
+        <span class="lang-fr">Si les deux sont désactivées, la marée est ignorée. Si les deux sont activées, l’une ou l’autre phase est acceptée.</span><br/>
+        <span class="lang-en">If both are off, tide is ignored. If both are on, either phase is allowed.</span>
       </p>
     </div>
   </div>
@@ -249,20 +257,20 @@
 
 <!-- Sticky info bar (updates on tap/click/focus) -->
 <div class="info-bar" id="infoBar">
-  <span class="info-dim">Tap a cell</span>
+  <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
 </div>
 
 <!-- Legend with reliable color boxes -->
 <div class="legend">
-  <span class="swatch c-g1"></span> 10–14 kn
-  <span class="swatch c-g2"></span> 14–18 kn
-  <span class="swatch c-y1"></span> 18–21 kn
-  <span class="swatch c-y2"></span> 21–25 kn
-  <span class="swatch c-r1"></span> 25–30 kn
-  <span class="swatch c-r2"></span> ≥30 kn
+  <span class="swatch c-g1"></span> <span class="lang-fr">10–14 nœuds</span> / <span class="lang-en">10–14 kn</span>
+  <span class="swatch c-g2"></span> <span class="lang-fr">14–18 nœuds</span> / <span class="lang-en">14–18 kn</span>
+  <span class="swatch c-y1"></span> <span class="lang-fr">18–21 nœuds</span> / <span class="lang-en">18–21 kn</span>
+  <span class="swatch c-y2"></span> <span class="lang-fr">21–25 nœuds</span> / <span class="lang-en">21–25 kn</span>
+  <span class="swatch c-r1"></span> <span class="lang-fr">25–30 nœuds</span> / <span class="lang-en">25–30 kn</span>
+  <span class="swatch c-r2"></span> <span class="lang-fr">≥30 nœuds</span> / <span class="lang-en">≥30 kn</span>
   &nbsp; | &nbsp;
-  <span class="swatch c-neutral"></span> Missing data / Données manquantes
-  <span class="swatch c-blank"></span> Criteria not met / Critères non remplis
+  <span class="swatch c-neutral"></span> <span class="lang-fr">Données manquantes</span> / <span class="lang-en">Missing data</span>
+  <span class="swatch c-blank"></span> <span class="lang-fr">Critères non remplis</span> / <span class="lang-en">Criteria not met</span>
 </div>
 
 <div id="matrices"></div>
@@ -297,13 +305,13 @@
     data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
   }catch(e){
     document.body.insertAdjacentHTML('beforeend',
-      '<p style="color:#b00">Could not load forecast.json. Run the “Update forecast” workflow once (Actions tab).</p>');
+      '<p style="color:#b00"><span class="lang-fr">Impossible de charger</span> / <span class="lang-en">Could not load</span> forecast.json.</p>');
     return;
   }
   const hours = data.hours || [];
   if (!hours.length){
     document.body.insertAdjacentHTML('beforeend',
-      '<p class="muted">No data yet. Run the “Update forecast” workflow, then refresh.</p>');
+      '<p class="muted"><span class="lang-fr">Aucune donnée pour le moment.</span> / <span class="lang-en">No data yet.</span></p>');
     return;
   }
 
@@ -312,7 +320,7 @@
   const matrices = document.getElementById('matrices');
   const toLocal = s => new Date(s);
   const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
-  const dayLabel = d => d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
+  const dayLabel = d => d.toLocaleDateString('fr-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
   const hourStr = d => d.toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:'America/Toronto' });
 
   function degToCardinal16(deg){
@@ -520,7 +528,7 @@
 
     const corner = document.createElement('th');
     corner.className = 'hour';
-    corner.textContent = 'Hour';
+    corner.textContent = 'Heure / Hour';
     htr.appendChild(corner);
 
     // For each day: tide stripe header + day header
@@ -636,7 +644,7 @@
       views[target].style.display = 'block';
       currentSpot = target;
       refreshSettingsPanel();
-      infoBar.innerHTML = '<span class="info-dim">Tap a cell</span>';
+      infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
     };
 
     // Cell click / keyboard support — event delegation per matrix
@@ -667,9 +675,9 @@
     infoBar.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div><b>${dk}</b> ${hr}:00</div>
-        <div>• Gust: <b>${gust} kn</b>${avg?` (avg ${avg})`:''}</div>
-        <div>• Dir: <b>${card}${deg?` ${deg}°`:''}</b> ${arrow}</div>
-        <div>• Tide: <b>${tide}</b></div>
+        <div>• <span class="lang-fr">Rafale</span> / <span class="lang-en">Gust</span>: <b>${gust} kn</b>${avg?` (avg ${avg})`:''}</div>
+        <div>• <span class="lang-fr">Direction</span> / <span class="lang-en">Dir</span>: <b>${card}${deg?` ${deg}°`:''}</b> ${arrow}</div>
+        <div>• <span class="lang-fr">Marée</span> / <span class="lang-en">Tide</span>: <b>${tide}</b></div>
       </div>`;
   }
 

@@ -75,6 +75,7 @@
     background:#fffffe;
     box-shadow: 0 1px 0 rgba(0,0,0,0.02);
     font-size:14px;
+    min-height:36px;
   }
   .info-bar .arrow{width:18px;height:18px}
   .info-dim{color:var(--muted)}
@@ -180,6 +181,24 @@
   let VIEW = 'daylight'; // 'daylight' | 'all'
   const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
 
+  // Spots (single definition!)
+  const spots = [
+    {key:'beauport',     label:'Baie de Beauport'},
+    {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
+    {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
+    {key:'ange_gardien', label:'Ange-Gardien'},
+  ];
+
+  // Build tabs once
+  const tabBar = document.getElementById('tabs');
+  spots.forEach((s,i)=>{
+    const tab = document.createElement('button');
+    tab.className = 'tab' + (i===0?' active':'');
+    tab.textContent = s.label;
+    tab.dataset.target = s.key;
+    tabBar.appendChild(tab);
+  });
+
   // Load data (cache-busted)
   let data;
   try{
@@ -197,6 +216,8 @@
   }
 
   // Helpers
+  const infoBar = document.getElementById('infoBar');
+  const matrices = document.getElementById('matrices');
   const toLocal = s => new Date(s);
   const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
   const dayLabel = d => d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
@@ -217,7 +238,6 @@
     </svg>`;
   }
 
-  // Color scale for cells that meet criteria
   function strengthColor(kn){
     if (kn == null || isNaN(kn)) return 'var(--neutral)';
     const v = Number(kn);
@@ -227,6 +247,14 @@
     if (v >= 18) return 'var(--y1)';
     if (v >= 14) return 'var(--g2)';
     return 'var(--g1)'; // 10–14
+  }
+
+  function tideStripeColor(state){
+    const s = (state||'').toLowerCase();
+    if (s==='rising')  return 'var(--tide-rise)';
+    if (s==='falling') return 'var(--tide-fall)';
+    if (s==='slack')   return 'var(--tide-slack)';
+    return 'var(--tide-unk)'; // unknown -> transparent
   }
 
   // Group ALL rows by day
@@ -242,36 +270,8 @@
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
 
-  const spots = [
-    {key:'beauport',     label:'Baie de Beauport'},
-    {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-    {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-    {key:'ange_gardien', label:'Ange-Gardien'},
-  ];
-
-  const tabBar = document.getElementById('tabs');
-  const matrices = document.getElementById('matrices');
-  const infoBar = document.getElementById('infoBar');
-
-  // Build tabs
-  spots.forEach((s,i)=>{
-    const tab = document.createElement('button');
-    tab.className = 'tab' + (i===0?' active':'');
-    tab.textContent = s.label;
-    tab.dataset.target = s.key;
-    tabBar.appendChild(tab);
-  });
-
-  function tideStripeColor(state){
-    const s = (state||'').toLowerCase();
-    if (s==='rising')  return 'var(--tide-rise)';
-    if (s==='falling') return 'var(--tide-fall)';
-    if (s==='slack')   return 'var(--tide-slack)';
-    return 'var(--tide-unk)'; // unknown -> transparent
-  }
-
   function buildMatrix(spotKey, mode){
-    const HSTART = HOUR_RANGE[mode][0], HEND = HOUR_RANGE[mode][1];
+    const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
 
     const container = document.createElement('div');
     container.className = 'matrix-wrap';
@@ -337,7 +337,7 @@
 
         // data cell
         const td = document.createElement('td');
-        const go = obj && obj.go ? !!obj.go[spotKey] : false;  // use THIS spot’s go flag
+        const go = obj && obj.go ? !!obj.go[spotKey] : false;  // THIS spot’s go flag
 
         let bg;
         if (obj.wind_kn == null) {
@@ -351,12 +351,10 @@
         const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
         const avg  = (obj.wind_avg_kn == null ? '' : `${obj.wind_avg_kn} kn`);
         const deg  = obj.dir_deg;
-        const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-        const card = (deg==null) ? '' : dirs[Math.round(((deg%360)/45)) % 8];
+        const card = deg==null ? '' : degToCardinal(deg);
 
         const tip = `${dk} ${hrStr}:00 — gust ${gust} kn${avg?`, avg ${avg}`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
 
-        // visual and accessibility
         td.innerHTML = `<div class="cell" title="${tip}" tabindex="0" role="button"
             data-spot="${spotKey}"
             data-day="${dk}"
@@ -383,13 +381,7 @@
   function render(mode){
     matrices.innerHTML = '';
     const views = {};
-    const spotList = [
-      {key:'beauport',     label:'Baie de Beauport'},
-      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-      {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-      {key:'ange_gardien', label:'Ange-Gardien'},
-    ];
-    spotList.forEach((s,i)=>{
+    spots.forEach((s,i)=>{
       const v = buildMatrix(s.key, mode);
       v.style.display = i===0 ? 'block':'none';
       v.id = 'view-'+s.key;
@@ -406,11 +398,10 @@
       const target = btn.dataset.target;
       Object.values(views).forEach(v=>v.style.display='none');
       views[target].style.display = 'block';
-      // Clear info bar when switching spots
       infoBar.innerHTML = '<span class="info-dim">Tap a cell</span>';
     };
 
-    // Cell click / keyboard support — event delegation per matrix container
+    // Cell click / keyboard support — event delegation per matrix
     Object.values(views).forEach(view=>{
       view.addEventListener('click', onCellActivate);
       view.addEventListener('keydown', (ev)=>{
@@ -443,21 +434,6 @@
         <div>• Tide: <b>${tide}</b></div>
       </div>`;
   }
-
-  // Build tabs initially
-  const spots = [
-    {key:'beauport',     label:'Baie de Beauport'},
-    {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-    {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-    {key:'ange_gardien', label:'Ange-Gardien'},
-  ];
-  spots.forEach((s,i)=>{
-    const tab = document.createElement('button');
-    tab.className = 'tab' + (i===0?' active':'');
-    tab.textContent = s.label;
-    tab.dataset.target = s.key;
-    document.getElementById('tabs').appendChild(tab);
-  });
 
   // Initial render
   render(VIEW);

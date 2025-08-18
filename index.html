@@ -17,8 +17,19 @@
 
   <!-- Favicon (place favicon.ico at repo root) -->
   <link rel="icon" href="favicon.ico" type="image/x-icon">
-  <!-- Optional: PWA-ish touch icon if you add the file later -->
-  <!-- <link rel="apple-touch-icon" href="apple-touch-icon.png"> -->
+
+  <!-- Leaflet (map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
   <style>
     :root{
@@ -159,6 +170,11 @@
     .c-neutral{background:var(--neutral)} .c-blank{background:var(--blank)}
 
     a{ color:#0a5; text-decoration:underline; }
+
+    /* Map section */
+    #mapWrap{ border:1px solid var(--grid-border); border-radius:10px; background:#fff; padding:8px; }
+    #map{ height: 360px; width: 100%; border-radius:8px; }
+    .leaflet-container a{ color:#0a5; }
   </style>
 </head>
 <body>
@@ -207,7 +223,21 @@
     </div>
   </details>
 
-  <!-- Collapsible: Spot conditions (collapsed by default) -->
+  <!-- NEW Collapsible: Map -->
+  <details class="collapsible" id="mapSection">
+    <summary>Carte / Map</summary>
+    <div class="content">
+      <div id="mapWrap">
+        <div id="map"></div>
+      </div>
+      <p class="muted" style="margin-top:6px">
+        <span class="lang-fr">Les secteurs affichés représentent les <b>directions de vent autorisées</b> que vous avez choisies pour le spot actif. Le vent souffle <b>depuis</b> ces secteurs vers le spot.</span><br/>
+        <span class="lang-en">The shown sectors represent the <b>allowed wind directions</b> you selected for the active spot. Wind blows <b>from</b> these sectors toward the spot.</span>
+      </p>
+    </div>
+  </details>
+
+  <!-- Collapsible: Spot conditions (text) -->
   <details class="collapsible">
     <summary>Conditions par site / Spot Conditions</summary>
     <div class="content">
@@ -339,13 +369,14 @@
     let VIEW = 'daylight'; // 'daylight' | 'all'
     const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
 
-    // Spots
+    // Spots + coordinates (for the map)
     const spots = [
-      {key:'beauport',     label:'Baie de Beauport'},
-      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-      {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-      {key:'ange_gardien', label:'Ange-Gardien'},
+      {key:'beauport',     label:'Baie de Beauport',            lat:46.8598,  lon:-71.2006},
+      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré',         lat:47.0153,  lon:-70.9280},
+      {key:'st_jean',      label:'St-Jean, Île d’Orléans',      lat:46.8577,  lon:-70.8169},
+      {key:'ange_gardien', label:'Ange-Gardien',                lat:46.907944,lon:-71.090028},
     ];
+    const spotByKey = Object.fromEntries(spots.map(s=>[s.key,s]));
 
     // Build tabs
     const tabBar = document.getElementById('tabs');
@@ -482,6 +513,8 @@
       });
       tideRise.checked = s.tides.has('rising');
       tideFall.checked = s.tides.has('falling');
+      // when settings panel refreshes, also update the map wedges
+      drawSpotSectorsOnMap(currentSpot);
     }
 
     // Interactions: directions chips
@@ -494,6 +527,7 @@
       chip.classList.toggle('on');
       saveSettings(currentSpot, s);
       render(VIEW);
+      drawSpotSectorsOnMap(currentSpot);
     });
 
     // Presets
@@ -513,6 +547,7 @@
         saveSettings(currentSpot, s);
         refreshSettingsPanel();
         render(VIEW);
+        drawSpotSectorsOnMap(currentSpot);
       });
     });
 
@@ -560,7 +595,7 @@
       return true;
     }
 
-    // Group by day (7 days shown if available in forecast.json)
+    // Group by day (show all days present in forecast.json)
     const byDayAll = new Map();
     for(const row of hours){
       const t = toLocal(row.time);
@@ -694,7 +729,7 @@
         views[s.key] = v;
       });
 
-      // Tab switching (also sets active spot for settings)
+      // Tab switching (also sets active spot for settings & map)
       tabBar.onclick = (e)=>{
         const btn = e.target.closest('.tab');
         if(!btn) return;
@@ -706,6 +741,9 @@
         currentSpot = target;
         refreshSettingsPanel();
         infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
+        // update map to the new spot
+        centerMapOnSpot(target);
+        drawSpotSectorsOnMap(target);
       };
 
       // Cell click / keyboard support — event delegation
@@ -742,6 +780,128 @@
         </div>`;
     }
 
+    // ---------- MAP ----------
+    const mapEl = document.getElementById('map');
+    let map = L.map(mapEl, { zoomControl:true, attributionControl:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
+    }).addTo(map);
+    let marker = null;
+    let sectorLayers = []; // polygons
+
+    // center / fit start
+    map.setView([46.88, -71.05], 10);
+
+    // When opening/closing the map section, fix sizing
+    const mapSection = document.getElementById('mapSection');
+    mapSection.addEventListener('toggle', ()=>{
+      setTimeout(()=> { map.invalidateSize(); }, 200);
+    });
+
+    function centerMapOnSpot(spotKey){
+      const s = spotByKey[spotKey];
+      if(!s) return;
+      map.setView([s.lat, s.lon], 12);
+      if (marker) { map.removeLayer(marker); }
+      marker = L.marker([s.lat, s.lon]).addTo(map).bindPopup(s.label);
+    }
+
+    // Convert a direction set (16-point) into merged angular ranges (deg FROM)
+    const SECTOR_CENTERS = {
+      'N':0,'NNE':22.5,'NE':45,'ENE':67.5,'E':90,'ESE':112.5,'SE':135,'SSE':157.5,
+      'S':180,'SSW':202.5,'SW':225,'WSW':247.5,'W':270,'WNW':292.5,'NW':315,'NNW':337.5
+    };
+    function dirsToRanges(dirSet){
+      if (!dirSet || dirSet.size===0) return [];
+      // Each sector spans ±11.25° around its center
+      const spans = Array.from(dirSet).map(name=>{
+        const c = SECTOR_CENTERS[name];
+        return [(c-11.25+360)%360, (c+11.25)%360];
+      });
+      // Normalize by sampling degrees on a ring to simplify merging
+      const covered = new Array(360).fill(false);
+      spans.forEach(([a,b])=>{
+        if(a<=b){
+          for(let d=Math.floor(a); d<=Math.ceil(b); d++) covered[(d+360)%360]=true;
+        }else{
+          for(let d=Math.floor(a); d<360; d++) covered[d]=true;
+          for(let d=0; d<=Math.ceil(b); d++) covered[d]=true;
+        }
+      });
+      // Merge continuous covered blocks into [start,end]
+      const ranges=[];
+      let inRun=false, start=0;
+      for(let d=0; d<360; d++){
+        if(covered[d] && !inRun){ inRun=true; start=d; }
+        if(!covered[d] && inRun){ inRun=false; ranges.push([start, d-1]); }
+      }
+      if(inRun) ranges.push([start, 359]);
+      // Wrap-around merge if first and last connect
+      if(ranges.length>1 && ranges[0][0]===0 && ranges[ranges.length-1][1]===359){
+        const last = ranges.pop();
+        ranges[0][0] = last[0];
+      }
+      return ranges;
+    }
+
+    // Destination point from lat/lon, bearing deg, distance km (spherical)
+    function destPoint(lat, lon, brgDeg, distKm){
+      const R = 6371.0088;
+      const δ = distKm / R;
+      const φ1 = lat * Math.PI/180;
+      const λ1 = lon * Math.PI/180;
+      const θ = brgDeg * Math.PI/180;
+      const sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1);
+      const sinδ = Math.sin(δ), cosδ = Math.cos(δ);
+      const sinφ2 = sinφ1*cosδ + cosφ1*sinδ*Math.cos(θ);
+      const φ2 = Math.asin(sinφ2);
+      const y = Math.sin(θ)*sinδ*cosφ1;
+      const x = cosδ - sinφ1*sinφ2;
+      const λ2 = λ1 + Math.atan2(y, x);
+      return [φ2*180/Math.PI, ((λ2*180/Math.PI+540)%360)-180];
+    }
+
+    function drawSector(lat, lon, startDeg, endDeg, radiusKm=8, steps=32){
+      // Build a wedge polygon from startDeg to endDeg (clockwise)
+      const pts = [];
+      pts.push([lat,lon]);
+      let a = startDeg, b = endDeg;
+      // Ensure we move the shortest forward path
+      const sweep = ((b - a + 360) % 360);
+      const step = Math.max(1, Math.round(sweep/steps));
+      for(let d=0; d<=sweep; d+=step){
+        const brg = (a + d) % 360;
+        pts.push(destPoint(lat, lon, brg, radiusKm));
+      }
+      pts.push(destPoint(lat, lon, b, radiusKm));
+      pts.push([lat,lon]);
+      return L.polygon(pts, {color:'#0a5', weight:1, fillColor:'#0a5', fillOpacity:0.18});
+    }
+
+    function clearSectors(){
+      sectorLayers.forEach(l=> map.removeLayer(l));
+      sectorLayers = [];
+    }
+
+    function drawSpotSectorsOnMap(spotKey){
+      const s = spotByKey[spotKey];
+      if(!s) return;
+      clearSectors();
+      const dirs = settings[spotKey].dirs;
+      const ranges = dirsToRanges(dirs);
+      ranges.forEach(([a,b])=>{
+        // Each range is the "FROM" sector; draw wedge accordingly
+        const poly = drawSector(s.lat, s.lon, a, b, 8, 40);
+        poly.addTo(map);
+        sectorLayers.push(poly);
+      });
+    }
+
+    // Center & draw current spot on first load
+    centerMapOnSpot('beauport');
+    drawSpotSectorsOnMap('beauport');
+
     // Init settings UI and first render
     const btnDay = document.getElementById('tgl-daylight');
     const btnAll = document.getElementById('tgl-all');
@@ -753,7 +913,9 @@
     render(VIEW);
     btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
     btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
+
   })();
   </script>
 </body>
 </html>
+

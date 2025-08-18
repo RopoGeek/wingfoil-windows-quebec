@@ -51,11 +51,12 @@
     padding: 12px 14px;
   }
   .rules-block h2 { font-size: 18px; margin: 0 0 8px; }
-  .rules-cols{ display:grid; grid-template-columns: 1fr; gap: 8px; }
-  @media (min-width: 720px){ .rules-cols{ grid-template-columns: 1fr 1fr; } }
+  .rules-cols{ display:grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 900px){ .rules-cols{ grid-template-columns: 1fr 1fr; } }
   .rules-block ul { margin: 0 0 6px 20px; padding: 0; }
   .rules-block li { margin-bottom: 4px; }
   .rules-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .rules-subtitle{ font-weight:600; margin: 4px 0 6px; }
 
   .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .tabs{display:flex;gap:8px;margin:10px 0}
@@ -137,7 +138,7 @@
   <span class="pill">Local time (America/Toronto)</span>
 </header>
 
-<!-- Bilingual rules at the top -->
+<!-- Bilingual rules + tides notes at the top -->
 <div class="rules-block">
   <h2>Spot Conditions / Conditions par site</h2>
   <div class="rules-cols">
@@ -160,15 +161,42 @@
           <i>Par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</i>
         </li>
       </ul>
-    </div>
-    <div>
       <p class="rules-note">
         Arrows point <b>from</b> the wind’s source (mean wind direction).<br/>
         <i>Les flèches pointent <b>depuis</b> la provenance du vent (direction moyenne).</i>
       </p>
+    </div>
+
+    <div>
+      <div class="rules-subtitle">Tides / Marées</div>
       <p class="rules-note">
-        Thin colored stripe by each day shows the tide phase (green = rising, red = falling, grey = slack).<br/>
-        <i>La fine bande à côté de chaque jour indique la phase de marée (vert = montante, rouge = descendante, gris = étale).</i>
+        The thin colored stripe beside each day indicates the tide phase for that spot (green = rising, red = falling, grey = slack).
+        These tide phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets applied to nearby spots.
+        For precise timing, consult the official tide stations below.
+      </p>
+      <p class="rules-note">
+        La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale).
+        Ces phases de marée sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins.
+        Pour des horaires précis, consultez les stations officielles ci-dessous.
+      </p>
+      <ul class="rules-note" style="margin-left:18px">
+        <li>
+          <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">Baie de Beauport – Official station 03250</a>
+        </li>
+        <li>
+          <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">Ste-Anne-de-Beaupré – Official station 03087</a>
+        </li>
+        <li>
+          <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">St-Jean, Île d’Orléans – Official station 03105</a>
+        </li>
+      </ul>
+      <p class="rules-note">
+        Ange-Gardien: there is no dedicated station. For a rough idea, use a time roughly mid-way between the tide change times at
+        Ste-Anne-de-Beaupré and Baie de Beauport.
+      </p>
+      <p class="rules-note">
+        Ange-Gardien : il n’y a pas de station dédiée. Pour une estimation rapide, utilisez une heure située environ à mi-chemin entre
+        les heures de changement de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.
       </p>
     </div>
   </div>
@@ -478,17 +506,6 @@
     arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
   }
   const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
-
-  function strengthColor(kn){
-    if (kn == null || isNaN(kn)) return 'var(--neutral)';
-    const v = Number(kn);
-    if (v >= 30) return 'var(--r2)';
-    if (v >= 25) return 'var(--r1)';
-    if (v >= 21) return 'var(--y2)';
-    if (v >= 18) return 'var(--y1)';
-    if (v >= 14) return 'var(--g2)';
-    return 'var(--g1)';
-  }
 
   function buildMatrix(spotKey, mode){
     const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);

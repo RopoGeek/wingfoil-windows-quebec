@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-08-19T18:00:00-04:00",
+  "generated_at": "2025-08-19T19:00:00-04:00",
   "hours": [
     {
       "time": "2025-08-19T00:00",
@@ -313,7 +313,7 @@
         "wind_kn": 5.6,
         "wind_avg_kn": 4.4,
         "dir_deg": 13,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -325,7 +325,7 @@
         "wind_kn": 8.2,
         "wind_avg_kn": 4.1,
         "dir_deg": 343,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -337,7 +337,7 @@
         "wind_kn": 7.4,
         "wind_avg_kn": 5.1,
         "dir_deg": 97,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -349,7 +349,7 @@
         "wind_kn": 5.6,
         "wind_avg_kn": 2.7,
         "dir_deg": 4,
-        "tide": "slack",
+        "tide": "unknown",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -925,7 +925,7 @@
         "wind_kn": 9.1,
         "wind_avg_kn": 7.4,
         "dir_deg": 55,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -937,7 +937,7 @@
         "wind_kn": 8.2,
         "wind_avg_kn": 6.3,
         "dir_deg": 56,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -949,11 +949,11 @@
         "wind_kn": 13.8,
         "wind_avg_kn": 10.4,
         "dir_deg": 37,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
-          "st_jean": true,
+          "st_jean": false,
           "ange_gardien": null
         }
       },
@@ -961,7 +961,7 @@
         "wind_kn": 9.3,
         "wind_avg_kn": 7.0,
         "dir_deg": 48,
-        "tide": "falling",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -9803,27 +9803,27 @@
   },
   "debug_counts": {
     "beauport": {
-      "unknown": 6,
+      "unknown": 7,
       "slack": 12,
-      "falling": 100,
+      "falling": 99,
       "rising": 74
     },
     "ste_anne": {
-      "unknown": 6,
+      "unknown": 7,
       "slack": 12,
-      "falling": 100,
+      "falling": 99,
       "rising": 74
     },
     "st_jean": {
-      "unknown": 6,
+      "unknown": 7,
       "slack": 12,
-      "falling": 100,
+      "falling": 99,
       "rising": 74
     },
     "ange_gardien": {
-      "unknown": 6,
+      "unknown": 7,
       "slack": 12,
-      "falling": 100,
+      "falling": 99,
       "rising": 74
     }
   },

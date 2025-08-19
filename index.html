@@ -12,10 +12,10 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_CA">
   <meta property="og:site_name" content="WIND-FILTRATOR">
-  <!-- Refresh page every hour to reflect new data -->
+  <!-- Auto-refresh page hourly (matches your data refresh cadence) -->
   <meta http-equiv="refresh" content="3600" />
 
-  <!-- Favicon (place favicon.ico at repo root) -->
+  <!-- Favicon (optional): place favicon.ico at repo root -->
   <link rel="icon" href="favicon.ico" type="image/x-icon">
 
   <!-- Leaflet (map) -->
@@ -223,13 +223,11 @@
     </div>
   </details>
 
-  <!-- NEW Collapsible: Map -->
+  <!-- Collapsible: Map -->
   <details class="collapsible" id="mapSection">
     <summary>Carte / Map</summary>
     <div class="content">
-      <div id="mapWrap">
-        <div id="map"></div>
-      </div>
+      <div id="mapWrap"><div id="map"></div></div>
       <p class="muted" style="margin-top:6px">
         <span class="lang-fr">Les secteurs affichés représentent les <b>directions de vent autorisées</b> que vous avez choisies pour le spot actif. Le vent souffle <b>depuis</b> ces secteurs vers le spot.</span><br/>
         <span class="lang-en">The shown sectors represent the <b>allowed wind directions</b> you selected for the active spot. Wind blows <b>from</b> these sectors toward the spot.</span>
@@ -365,11 +363,12 @@
 
   <script>
   (async function(){
-    // Default view mode
+    // ---------- Config ----------
     let VIEW = 'daylight'; // 'daylight' | 'all'
     const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
+    const TZ = 'America/Toronto';
 
-    // Spots + coordinates (for the map ONLY; forecast uses forecast.json)
+    // Spots for MAP DISPLAY ONLY (forecast values come from forecast.json)
     const spots = [
       {key:'beauport',     label:'Baie de Beauport',            lat:46.83938157700642,  lon:-71.18913476445113},
       {key:'ste_anne',     label:'Ste-Anne-de-Beaupré',         lat:47.0153,            lon:-70.9280},
@@ -378,54 +377,56 @@
     ];
     const spotByKey = Object.fromEntries(spots.map(s=>[s.key,s]));
 
-    // Build tabs
-    const tabBar = document.getElementById('tabs');
-    spots.forEach((s,i)=>{
-      const tab = document.createElement('button');
-      tab.className = 'tab' + (i===0?' active':'');
-      tab.textContent = s.label;
-      tab.dataset.target = s.key;
-      tabBar.appendChild(tab);
-    });
+    // 16-point sectors
+    const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    const SECTOR_CENTERS = {
+      'N':0,'NNE':22.5,'NE':45,'ENE':67.5,'E':90,'ESE':112.5,'SE':135,'SSE':157.5,
+      'S':180,'SSW':202.5,'SW':225,'WSW':247.5,'W':270,'WNW':292.5,'NW':315,'NNW':337.5
+    };
 
-    // Load data
-    let data;
-    try{
-      data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
-    }catch(e){
-      document.body.insertAdjacentHTML('beforeend',
-        '<p style="color:#b00"><span class="lang-fr">Impossible de charger</span> / <span class="lang-en">Could not load</span> forecast.json.</p>');
-      return;
-    }
-    const hours = data.hours || [];
-    if (!hours.length){
-      document.body.insertAdjacentHTML('beforeend',
-        '<p class="muted"><span class="lang-fr">Aucune donnée pour le moment.</span> / <span class="lang-en">No data yet.</span></p>');
-      return;
-    }
+    // Defaults per spot
+    const defaultSettings = {
+      beauport:     { min:10, dirs: new Set(SECTORS),                tides: new Set(['rising','falling']) },
+      ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
+      st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']),     tides: new Set(['falling']) },
+      ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
+    };
 
-    // Helpers
-    const infoBar = document.getElementById('infoBar');
+    // ---------- DOM refs ----------
+    const tabBar   = document.getElementById('tabs');
     const matrices = document.getElementById('matrices');
+    const infoBar  = document.getElementById('infoBar');
+    const gustSel  = document.getElementById('minGustSelect');
+    const dirGrid  = document.getElementById('dirGrid');
+    const tideRise = document.getElementById('tideRise');
+    const tideFall = document.getElementById('tideFall');
+    const btnDay   = document.getElementById('tgl-daylight');
+    const btnAll   = document.getElementById('tgl-all');
+
+    // ---------- Helpers ----------
     const toLocal = s => new Date(s);
-    const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
-    const dayLabel = d => d.toLocaleDateString('fr-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:'America/Toronto' });
-    const hourStr = d => d.toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:'America/Toronto' });
+    const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: TZ });
+    const dayLabel = d => d.toLocaleDateString('fr-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:TZ });
+    const hourStr = d => d.toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:TZ });
 
     function degToCardinal16(deg){
       if (deg==null || isNaN(deg)) return '';
-      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      const dirs = SECTORS;
       const ix = Math.round(((deg%360)/22.5)) % 16;
       return dirs[ix];
     }
     function arrowSVG(deg, size=12){
       if (deg==null || isNaN(deg)) return '';
-      const rot = (180 + Number(deg)) % 360; // show FROM
+      const rot = (180 + Number(deg)) % 360; // FROM direction
       return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg);width:${size}px;height:${size}px">
         <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
       </svg>`;
     }
-
+    function sectorOf(deg){
+      if (deg==null || isNaN(deg)) return null;
+      const i = Math.round(((deg%360)/22.5)) % 16;
+      return SECTORS[i];
+    }
     function strengthColor(kn){
       if (kn == null || isNaN(kn)) return 'var(--neutral)';
       const v = Number(kn);
@@ -441,26 +442,40 @@
       if (s==='rising')  return 'var(--tide-rise)';
       if (s==='falling') return 'var(--tide-fall)';
       if (s==='slack')   return 'var(--tide-slack)';
-      return 'var(--tide-unk)'; // unknown -> transparent
+      return 'var(--tide-unk)';
     }
 
-    // ---------- Per-spot settings (saved per spot in localStorage) ----------
+    // ---------- Load forecast.json ----------
+    let data;
+    try{
+      data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
+    }catch(e){
+      document.body.insertAdjacentHTML('beforeend',
+        '<p style="color:#b00"><span class="lang-fr">Impossible de charger</span> / <span class="lang-en">Could not load</span> forecast.json.</p>');
+      return;
+    }
+    const hours = data.hours || [];
+    if (!hours.length){
+      document.body.insertAdjacentHTML('beforeend',
+        '<p class="muted"><span class="lang-fr">Aucune donnée pour le moment.</span> / <span class="lang-en">No data yet.</span></p>');
+      return;
+    }
+
+    // ---------- Group by day ----------
+    const byDayAll = new Map();
+    for(const row of hours){
+      const t = toLocal(row.time);
+      const k = dayKey(t);
+      if(!byDayAll.has(k)) byDayAll.set(k, []);
+      byDayAll.get(k).push(row);
+    }
+    for(const arr of byDayAll.values()){
+      arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
+    }
+    const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
+
+    // ---------- Per-spot settings (saved in localStorage) ----------
     const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // 8..25 inclusive
-    const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-
-    function sectorOf(deg){
-      if (deg==null || isNaN(deg)) return null;
-      const i = Math.round(((deg%360)/22.5)) % 16;
-      return SECTORS[i];
-    }
-
-    const defaultSettings = {
-      beauport:     { min:10, dirs: new Set(SECTORS),                tides: new Set(['rising','falling']) },
-      ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
-      st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']),     tides: new Set(['falling']) },
-      ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
-    };
-
     function loadSettings(spotKey){
       const raw = localStorage.getItem('wf_settings_'+spotKey);
       if(!raw) return structuredClone(defaultSettings[spotKey]);
@@ -478,23 +493,20 @@
         min: s.min, dirs: Array.from(s.dirs), tides: Array.from(s.tides)
       }));
     }
-
-    let currentSpot = 'beauport';
     let settings = {
       beauport:loadSettings('beauport'),
       ste_anne:loadSettings('ste_anne'),
       st_jean:loadSettings('st_jean'),
       ange_gardien:loadSettings('ange_gardien')
     };
+    let currentSpot = 'beauport';
 
-    // Build settings panel controls
-    const gustSel = document.getElementById('minGustSelect');
+    // Fill UI choices
     MIN_KN_OPTIONS.forEach(v=>{
       const opt = document.createElement('option');
       opt.value = v; opt.textContent = v + ' kn';
       gustSel.appendChild(opt);
     });
-    const dirGrid = document.getElementById('dirGrid');
     SECTORS.forEach(sec=>{
       const div = document.createElement('div');
       div.className = 'chip';
@@ -502,8 +514,6 @@
       div.dataset.sec = sec;
       dirGrid.appendChild(div);
     });
-    const tideRise = document.getElementById('tideRise');
-    const tideFall = document.getElementById('tideFall');
 
     function refreshSettingsPanel(){
       const s = settings[currentSpot];
@@ -513,11 +523,10 @@
       });
       tideRise.checked = s.tides.has('rising');
       tideFall.checked = s.tides.has('falling');
-      // when settings panel refreshes, also update the map wedges
       drawSpotSectorsOnMap(currentSpot);
     }
 
-    // Interactions: directions chips
+    // Direction chip clicks
     dirGrid.addEventListener('click', (e)=>{
       const chip = e.target.closest('.chip');
       if(!chip) return;
@@ -535,15 +544,10 @@
       p.addEventListener('click', ()=>{
         const which = p.dataset.preset;
         const s = settings[currentSpot];
-        if(which==='any'){
-          s.dirs = new Set(SECTORS);
-        }else if(which==='sw'){
-          s.dirs = new Set(['SSW','SW','WSW']);
-        }else if(which==='ne'){
-          s.dirs = new Set(['NNE','NE','ENE']);
-        }else if(which==='none'){
-          s.dirs = new Set();
-        }
+        if(which==='any'){ s.dirs = new Set(SECTORS); }
+        else if(which==='sw'){ s.dirs = new Set(['SSW','SW','WSW']); }
+        else if(which==='ne'){ s.dirs = new Set(['NNE','NE','ENE']); }
+        else if(which==='none'){ s.dirs = new Set(); }
         saveSettings(currentSpot, s);
         refreshSettingsPanel();
         render(VIEW);
@@ -551,15 +555,13 @@
       });
     });
 
-    // Gust select
+    // Gust select & tide checkboxes
     gustSel.addEventListener('change', ()=>{
       const s = settings[currentSpot];
       s.min = Number(gustSel.value);
       saveSettings(currentSpot, s);
       render(VIEW);
     });
-
-    // Tide checkboxes
     tideRise.addEventListener('change', ()=>{
       const s = settings[currentSpot];
       if(tideRise.checked) s.tides.add('rising'); else s.tides.delete('rising');
@@ -573,41 +575,34 @@
       render(VIEW);
     });
 
-    // ---------- Table logic ----------
+    // ---------- Tabs ----------
+    spots.forEach((s,i)=>{
+      const tab = document.createElement('button');
+      tab.className = 'tab' + (i===0?' active':'');
+      tab.textContent = s.label;
+      tab.dataset.target = s.key;
+      tabBar.appendChild(tab);
+    });
+
+    // ---------- Rules check ----------
     function meetsUserRules(spotKey, gust, dir_deg, tide){
       const s = settings[spotKey];
       // gust
       if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;
-      // direction (if none selected, treat as ANY)
+      // direction (if none selected -> treat as ANY)
       if (dir_deg != null && !isNaN(dir_deg)) {
         const sec = sectorOf(Number(dir_deg));
         if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;
       } else {
         return false;
       }
-      // tide filter
+      // tide
       const t = String(tide||'unknown').toLowerCase();
-      if (s.tides.size === 0) {
-        // ignoring tide
-      } else {
-        if (!s.tides.has(t)) return false;
-      }
+      if (s.tides.size > 0 && !s.tides.has(t)) return false;
       return true;
     }
 
-    // Group by day (show all days present in forecast.json)
-    const byDayAll = new Map();
-    for(const row of hours){
-      const t = toLocal(row.time);
-      const k = dayKey(t);
-      if(!byDayAll.has(k)) byDayAll.set(k, []);
-      byDayAll.get(k).push(row);
-    }
-    for(const arr of byDayAll.values()){
-      arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
-    }
-    const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
-
+    // ---------- Build one matrix ----------
     function buildMatrix(spotKey, mode){
       const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
 
@@ -615,7 +610,7 @@
       container.className = 'matrix-wrap';
       const tbl = document.createElement('table');
 
-      // Header
+      // Header row
       const thead = document.createElement('thead');
       const htr = document.createElement('tr');
 
@@ -624,7 +619,6 @@
       corner.textContent = 'Heure / Hour';
       htr.appendChild(corner);
 
-      // For each day: tide stripe header + day header
       dayOrder.forEach(dk=>{
         const thStripe = document.createElement('th');
         thStripe.className = 'tideStripeHead';
@@ -639,7 +633,7 @@
       thead.appendChild(htr);
       tbl.appendChild(thead);
 
-      // Build map[day][hour] = row[spotKey]
+      // Map day->hour->spot object
       const map = {};
       dayOrder.forEach(k=>{
         map[k] = {};
@@ -650,19 +644,17 @@
         });
       });
 
+      // Body rows
       const tbody = document.createElement('tbody');
-
       for(let hour=HSTART; hour<=HEND; hour++){
         const hrStr = hour.toString().padStart(2,'0');
         const tr = document.createElement('tr');
 
-        // Hour header
         const th = document.createElement('th');
         th.className = 'hour';
         th.innerHTML = `<span class="hour-label">${hrStr}</span>`;
         tr.appendChild(th);
 
-        // For each day: tide stripe + data cell
         dayOrder.forEach(dk=>{
           const obj = (map[dk] && map[dk][hrStr]) ? map[dk][hrStr] : {};
           const tideState = (obj && obj.tide) ? obj.tide : 'unknown';
@@ -675,7 +667,6 @@
 
           // data cell
           const td = document.createElement('td');
-
           let bg;
           if (obj.wind_kn == null) {
             bg = 'var(--neutral)';           // missing data
@@ -702,7 +693,6 @@
               data-tide="${tideState}"
             >${deg!=null ? arrowSVG(deg) : ''}</div>`;
           td.querySelector('.cell').style.background = bg;
-
           tr.appendChild(td);
         });
 
@@ -714,12 +704,10 @@
       return container;
     }
 
+    // ---------- Render all spot views ----------
     function render(mode){
-      // Build matrices
-      const matrices = document.getElementById('matrices');
       matrices.innerHTML = '';
       const views = {};
-      const tabBar = document.getElementById('tabs');
 
       spots.forEach((s,i)=>{
         const v = buildMatrix(s.key, mode);
@@ -727,9 +715,18 @@
         v.id = 'view-'+s.key;
         matrices.appendChild(v);
         views[s.key] = v;
+
+        // cell interactions
+        v.addEventListener('click', onCellActivate);
+        v.addEventListener('keydown', (ev)=>{
+          if(ev.key==='Enter' || ev.key===' '){
+            const el = ev.target.closest('.cell');
+            if(el){ ev.preventDefault(); onCellActivate(ev); }
+          }
+        });
       });
 
-      // Tab switching (also sets active spot for settings & map)
+      // Tab switching
       tabBar.onclick = (e)=>{
         const btn = e.target.closest('.tab');
         if(!btn) return;
@@ -741,24 +738,12 @@
         currentSpot = target;
         refreshSettingsPanel();
         infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
-        // update map to the new spot
         centerMapOnSpot(target);
         drawSpotSectorsOnMap(target);
       };
-
-      // Cell click / keyboard support — event delegation
-      Object.values(views).forEach(view=>{
-        view.addEventListener('click', onCellActivate);
-        view.addEventListener('keydown', (ev)=>{
-          if(ev.key==='Enter' || ev.key===' '){
-            const el = ev.target.closest('.cell');
-            if(el){ ev.preventDefault(); onCellActivate(ev); }
-          }
-        });
-      });
     }
 
-    // Sticky info bar update from a cell
+    // ---------- Info bar from cell ----------
     function onCellActivate(ev){
       const cell = ev.target.closest('.cell');
       if(!cell) return;
@@ -770,7 +755,6 @@
       const card = cell.dataset.card || '';
       const tide = (cell.dataset.tide || 'unknown');
       const arrow = (deg ? arrowSVG(deg,18) : '');
-
       infoBar.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div><b>${dk}</b> ${hr}:00</div>
@@ -780,24 +764,15 @@
         </div>`;
     }
 
-    // ---------- MAP ----------
+    // ---------- Map ----------
     const mapEl = document.getElementById('map');
-    let map = L.map(mapEl, { zoomControl:true, attributionControl:true });
+    const map = L.map(mapEl, { zoomControl:true, attributionControl:true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
     }).addTo(map);
     let marker = null;
-    let sectorLayers = []; // polygons
-
-    // center / fit start
-    map.setView([46.88, -71.05], 10);
-
-    // When opening/closing the map section, fix sizing
-    const mapSection = document.getElementById('mapSection');
-    mapSection.addEventListener('toggle', ()=>{
-      setTimeout(()=> { map.invalidateSize(); }, 200);
-    });
+    let sectorLayers = [];
 
     function centerMapOnSpot(spotKey){
       const s = spotByKey[spotKey];
@@ -807,47 +782,7 @@
       marker = L.marker([s.lat, s.lon]).addTo(map).bindPopup(s.label);
     }
 
-    // Convert a direction set (16-point) into merged angular ranges (deg FROM)
-    const SECTOR_CENTERS = {
-      'N':0,'NNE':22.5,'NE':45,'ENE':67.5,'E':90,'ESE':112.5,'SE':135,'SSE':157.5,
-      'S':180,'SSW':202.5,'SW':225,'WSW':247.5,'W':270,'WNW':292.5,'NW':315,'NNW':337.5
-    };
-    const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; // re-declare for clarity
-
-    function dirsToRanges(dirSet){
-      if (!dirSet || dirSet.size===0) return [];
-      // Each sector spans ±11.25° around its center
-      const spans = Array.from(dirSet).map(name=>{
-        const c = SECTOR_CENTERS[name];
-        return [(c-11.25+360)%360, (c+11.25)%360];
-      });
-      // Normalize by sampling degrees on a ring to simplify merging
-      const covered = new Array(360).fill(false);
-      spans.forEach(([a,b])=>{
-        if(a<=b){
-          for(let d=Math.floor(a); d<=Math.ceil(b); d++) covered[(d+360)%360]=true;
-        }else{
-          for(let d=Math.floor(a); d<360; d++) covered[d]=true;
-          for(let d=0; d<=Math.ceil(b); d++) covered[d]=true;
-        }
-      });
-      // Merge continuous covered blocks into [start,end]
-      const ranges=[];
-      let inRun=false, start=0;
-      for(let d=0; d<360; d++){
-        if(covered[d] && !inRun){ inRun=true; start=d; }
-        if(!covered[d] && inRun){ inRun=false; ranges.push([start, d-1]); }
-      }
-      if(inRun) ranges.push([start, 359]);
-      // Wrap-around merge if first and last connect
-      if(ranges.length>1 && ranges[0][0]===0 && ranges[ranges.length-1][1]===359){
-        const last = ranges.pop();
-        ranges[0][0] = last[0];
-      }
-      return ranges;
-    }
-
-    // Destination point from lat/lon, bearing deg, distance km (spherical)
+    // Sector maths
     function destPoint(lat, lon, brgDeg, distKm){
       const R = 6371.0088;
       const δ = distKm / R;
@@ -863,30 +798,48 @@
       const λ2 = λ1 + Math.atan2(y, x);
       return [φ2*180/Math.PI, ((λ2*180/Math.PI+540)%360)-180];
     }
-
-    function drawSector(lat, lon, startDeg, endDeg, radiusKm=8, steps=32){
-      // Build a wedge polygon from startDeg to endDeg (clockwise)
+    function drawSector(lat, lon, startDeg, endDeg, radiusKm=8, steps=40){
       const pts = [];
       pts.push([lat,lon]);
-      let a = startDeg, b = endDeg;
-      // Ensure we move the shortest forward path
-      const sweep = ((b - a + 360) % 360);
+      const sweep = ((endDeg - startDeg + 360) % 360);
       const step = Math.max(1, Math.round(sweep/steps));
       for(let d=0; d<=sweep; d+=step){
-        const brg = (a + d) % 360;
+        const brg = (startDeg + d) % 360;
         pts.push(destPoint(lat, lon, brg, radiusKm));
       }
-      pts.push(destPoint(lat, lon, b, radiusKm));
+      pts.push(destPoint(lat, lon, endDeg, radiusKm));
       pts.push([lat,lon]);
       return L.polygon(pts, {color:'#0a5', weight:1, fillColor:'#0a5', fillOpacity:0.18});
     }
-
-    let sectorLayers = []; // polygons
-    function clearSectors(){
-      sectorLayers.forEach(l=> map.removeLayer(l));
-      sectorLayers = [];
+    function clearSectors(){ sectorLayers.forEach(l=> map.removeLayer(l)); sectorLayers = []; }
+    function dirsToRanges(dirSet){
+      if (!dirSet || dirSet.size===0) return [];
+      const spans = Array.from(dirSet).map(name=>{
+        const c = SECTOR_CENTERS[name];
+        return [(c-11.25+360)%360, (c+11.25)%360];
+      });
+      const covered = new Array(360).fill(false);
+      spans.forEach(([a,b])=>{
+        if(a<=b){
+          for(let d=Math.floor(a); d<=Math.ceil(b); d++) covered[(d+360)%360]=true;
+        }else{
+          for(let d=Math.floor(a); d<360; d++) covered[d]=true;
+          for(let d=0; d<=Math.ceil(b); d++) covered[d]=true;
+        }
+      });
+      const ranges=[];
+      let inRun=false, start=0;
+      for(let d=0; d<360; d++){
+        if(covered[d] && !inRun){ inRun=true; start=d; }
+        if(!covered[d] && inRun){ inRun=false; ranges.push([start, d-1]); }
+      }
+      if(inRun) ranges.push([start, 359]);
+      if(ranges.length>1 && ranges[0][0]===0 && ranges[ranges.length-1][1]===359){
+        const last = ranges.pop();
+        ranges[0][0] = last[0];
+      }
+      return ranges;
     }
-
     function drawSpotSectorsOnMap(spotKey){
       const s = spotByKey[spotKey];
       if(!s) return;
@@ -894,56 +847,31 @@
       const dirs = settings[spotKey].dirs;
       const ranges = dirsToRanges(dirs);
       ranges.forEach(([a,b])=>{
-        // Each range is the "FROM" sector; draw wedge accordingly
         const poly = drawSector(s.lat, s.lon, a, b, 8, 40);
         poly.addTo(map);
         sectorLayers.push(poly);
       });
     }
 
-    // Center & draw current spot on first load
-    function centerMapOnSpot(spotKey){
-      const s = spotByKey[spotKey];
-      if(!s) return;
-      map.setView([s.lat, s.lon], 12);
-      if (window._marker) { map.removeLayer(window._marker); }
-      window._marker = L.marker([s.lat, s.lon]).addTo(map).bindPopup(s.label);
-    }
+    // Map initial state & collapsible sizing
+    map.setView([46.88, -71.05], 10);
     centerMapOnSpot('beauport');
     drawSpotSectorsOnMap('beauport');
+    document.getElementById('mapSection').addEventListener('toggle', ()=>{
+      setTimeout(()=> map.invalidateSize(), 200);
+    });
 
-    // Init settings UI and first render
-    const btnDay = document.getElementById('tgl-daylight');
-    const btnAll = document.getElementById('tgl-all');
-
-    const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // already declared above but used for select fill earlier
-
-    const gustSel = document.getElementById('minGustSelect');
-    const dirGrid = document.getElementById('dirGrid');
-    const tideRise = document.getElementById('tideRise');
-    const tideFall = document.getElementById('tideFall');
-
+    // ---------- View toggles ----------
     function setToggle(active){
       btnDay.classList.toggle('active', active==='daylight');
       btnAll.classList.toggle('active', active==='all');
     }
-    function refreshSettingsPanel(){
-      const s = settings[currentSpot];
-      gustSel.value = s.min;
-      [...dirGrid.children].forEach(ch=>{
-        ch.classList.toggle('on', s.dirs.has(ch.dataset.sec));
-      });
-      tideRise.checked = s.tides.has('rising');
-      tideFall.checked = s.tides.has('falling');
-      drawSpotSectorsOnMap(currentSpot);
-    }
-
-    refreshSettingsPanel();
-    render(VIEW);
     btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
     btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
 
-    // Tab switching handled in render()
+    // ---------- First paint ----------
+    refreshSettingsPanel();
+    render(VIEW);
 
   })();
   </script>

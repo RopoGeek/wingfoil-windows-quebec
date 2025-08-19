@@ -16,7 +16,7 @@ HOURS = 168  # forecast horizon (hours) -> 7 days
 SPOTS = {
     "beauport":     {"name": "Baie de Beauport",             "lat": 46.8598,    "lon": -71.2006},
     "ste_anne":     {"name": "Quai Ste-Anne-de-Beaupré",     "lat": 47.0153,    "lon": -70.9280},
-    "st_jean":      {"name": "Quai St-Jean, Île d’Orléans",  "lat": 46.8577,    "lon": -70.8169},
+    "st_jean":      {"name": "Quai St-Jean, Île d’Orléans",  "lat": 46.915308,    "lon": -70.89627},
     "ange_gardien": {"name": "Ange-Gardien",                  "lat": 46.907944,  "lon": -71.090028},
 }
 

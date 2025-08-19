@@ -12,110 +12,292 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_CA">
   <meta property="og:site_name" content="WIND-FILTRATOR">
+  <!-- Auto-refresh page hourly (matches your data refresh cadence) -->
   <meta http-equiv="refresh" content="3600" />
+
+  <!-- Favicon (optional): place favicon.ico at repo root -->
   <link rel="icon" href="favicon.ico" type="image/x-icon">
 
-  <!-- Leaflet -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+  <!-- Leaflet (map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
-  <!-- Project styles -->
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root{
+      /* cell colors */
+      --neutral:#eee;         /* missing data (grey) */
+      --blank:#ffffff;        /* criteria not met (blank) */
+
+      /* strength scale (gust, when criteria are met) */
+      --g1:#e9f9e4;  /* 10–14 kn */
+      --g2:#b7f3af;  /* 14–18 kn */
+      --y1:#fff3b0;  /* 18–21 kn */
+      --y2:#ffd36e;  /* 21–25 kn */
+      --r1:#ffb3a8;  /* 25–30 kn */
+      --r2:#ff8a80;  /* 30+   */
+
+      /* chrome */
+      --grid-border:#ddd;
+      --text:#222;
+      --muted:#666;
+
+      /* tide stripes */
+      --tide-rise:#0a6;   /* dark green for Rising */
+      --tide-fall:#b00;   /* dark red for Falling */
+      --tide-slack:#bbb;  /* light grey for Slack */
+      --tide-unk:transparent;
+
+      /* UI */
+      --chip:#f5f5f5;
+      --chip-on:#ddf3e6;
+      --chip-border:#cfcfcf;
+
+      /* language styling */
+      --en-color:#505050;
+
+      /* collapsibles */
+      --collp-bg:#fafafa;
+      --collp-border:#e6e6e6;
+      --collp-summary:#222;
+    }
+
+    body{font-family:system-ui,Segoe UI,Arial;margin:20px;color:var(--text);background:#f9f9f9}
+    header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    h1{font-size:24px;margin:0}
+    .pill{border:1px solid #aaa;border-radius:999px;padding:2px 8px;font-size:12px;color:#444}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* language tone */
+    .lang-fr{font-family:system-ui,Segoe UI,Arial}
+    .lang-en{font-family:ui-serif,Georgia,"Times New Roman",serif;color:var(--en-color)}
+
+    /* Collapsible sections */
+    .collapsible{border:1px solid var(--collp-border); border-radius:10px; background:var(--collp-bg); margin:10px 0}
+    .collapsible summary{
+      cursor:pointer; list-style:none; padding:10px 12px; font-weight:600; color:var(--collp-summary);
+      display:flex; align-items:center; gap:8px; user-select:none;
+    }
+    .collapsible summary::before{
+      content:"+"; width:18px; height:18px; display:inline-grid; place-items:center;
+      border:1px solid #ccc; border-radius:4px; font-weight:700; background:#fff;
+    }
+    .collapsible[open] summary::before{ content:"–"; }
+    .collapsible .content{ padding:10px 12px 12px; font-size:14px; line-height:1.5 }
+    .collapsible ul{ margin:6px 0 6px 20px; }
+    .collapsible li{ margin:6px 0; }
+
+    .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+    .tabs{display:flex;gap:8px;margin:10px 0}
+    .tab,.toggle{ padding:6px 10px;border:1px solid #ccc;border-radius:999px;cursor:pointer;background:#fff }
+    .tab.active{background:#f3fff6;border-color:#8fd4a8;color:#0a6}
+    .toggle.active{background:#eef6ff;border-color:#76a7ff;color:#0a4}
+
+    /* Settings panel */
+    .settings-wrap{
+      border:1px solid var(--grid-border);
+      border-radius:10px;
+      padding:10px;
+      margin:10px 0 14px;
+      background:#fff;
+    }
+    .settings-grid{
+      display:grid; gap:10px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width:900px){
+      .settings-grid{ grid-template-columns: 220px 1fr 220px; align-items:flex-start; }
+    }
+    .settings-section h3{ margin:0 0 6px; font-size:14px }
+    .select, .checkboxes{ font-size:14px }
+    select{ padding:6px 8px; border:1px solid #ccc; border-radius:8px; background:#fff; }
+    .dir-grid{
+      display:grid; grid-template-columns: repeat(8, minmax(56px,1fr)); gap:6px;
+    }
+    .chip{
+      user-select:none;
+      padding:6px 6px; border:1px solid var(--chip-border); border-radius:8px;
+      text-align:center; background:var(--chip); cursor:pointer; font-size:12px;
+    }
+    .chip.on{ background:var(--chip-on); border-color:#6ec099; }
+    .preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px }
+    .preset{ font-size:12px; background:#f0f6ff; border:1px solid #bcd3ff; border-radius:999px; padding:4px 8px; cursor:pointer }
+
+    /* Sticky info bar for tap/focus */
+    .info-bar{
+      position: sticky; top: 0; z-index: 5;
+      display:flex; align-items:center; gap:10px;
+      padding:8px 10px; border:1px solid var(--grid-border); border-radius:10px;
+      background:#fffffe; box-shadow: 0 1px 0 rgba(0,0,0,0.02); font-size:14px; min-height:36px;
+    }
+    .info-bar .arrow{width:18px;height:18px}
+    .info-dim{color:var(--muted)}
+
+    /* Matrix */
+    .matrix-wrap{overflow-x:auto;border:1px solid var(--grid-border);border-radius:10px;background:#fff}
+    table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+    th,td{border-right:1px solid var(--grid-border);border-bottom:1px solid var(--grid-border)}
+    th{position:sticky;top:0;background:#fafafa;font-weight:600;font-size:12px}
+    th.hour{position:sticky;left:0;background:#fafafa;font-weight:500;width:60px}
+    th.day{min-width:90px;text-align:center}
+    /* tiny tide stripe column placed before each day */
+    th.tideStripeHead{width:6px;padding:0;background:#fafafa}
+    td.tideStripe{width:6px;padding:0}
+    td{height:18px;width:56px;padding:0}  /* data columns */
+    .cell{
+      height:18px;display:flex;align-items:center;justify-content:center;
+      outline:none; cursor:pointer;
+    }
+    .cell:focus{box-shadow: inset 0 0 0 2px #8fd4a8}
+    .hour-label{padding:0 6px;font-size:12px;color:#555}
+    /* arrow */
+    .arrow{width:12px;height:12px;opacity:0.9}
+
+    /* Legend with reliable color boxes (iOS-safe) */
+    .legend{margin:6px 0 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px}
+    .swatch{display:inline-block; min-width:16px; width:16px; height:12px; border:1px solid #bbb; vertical-align:middle}
+    .c-g1{background:var(--g1)} .c-g2{background:var(--g2)}
+    .c-y1{background:var(--y1)} .c-y2{background:var(--y2)}
+    .c-r1{background:var(--r1)} .c-r2{background:var(--r2)}
+    .c-neutral{background:var(--neutral)} .c-blank{background:var(--blank)}
+
+    a{ color:#0a5; text-decoration:underline; }
+
+    /* Map section */
+    #mapWrap{ border:1px solid var(--grid-border); border-radius:10px; background:#fff; padding:8px; }
+    #map{ height: 360px; width: 100%; border-radius:8px; }
+    .leaflet-container a{ color:#0a5; }
+  </style>
 </head>
 <body>
+
   <header>
     <h1>WIND-FILTRATOR - Quebec</h1>
     <span class="pill">Heure locale / Local time (America/Toronto)</span>
   </header>
 
-  <!-- Intro (collapsed by default to save space) -->
+  <!-- Collapsible: Introduction -->
   <details class="collapsible">
     <summary>Introduction</summary>
     <div class="content">
       <p class="lang-fr">
         Ce site offre une <b>vision générale</b> des <b>moments intéressants</b> pour les <b>sports de vent</b>
         au cours de la semaine à venir, selon des <b>préférences personnelles</b> (rafale minimale, secteurs de vent, marée).
-        Les spots inclus sont des <b>sites populaires autour de la ville de Québec</b> : Baie de Beauport, Ste-Anne-de-Beaupré,
-        St-Jean (Île d’Orléans) et Ange-Gardien. Pour une <b>consultation détaillée</b> :
+        Les spots inclus sont des <b>sites populaires autour de la ville de Québec</b> : Baie de Beauport, Ste-Anne-de-Beaupré, St-Jean (Île d’Orléans) et Ange-Gardien.
+        Pour une <b>consultation détaillée</b> et des données plus précises, utilisez des ressources dédiées au Québec :
         <a href="https://asvq.ca" target="_blank" rel="noopener">asvq.ca</a>,
+        des applications de vent populaires comme 
         <a href="https://windy.app" target="_blank" rel="noopener">Windy.app</a>,
         <a href="https://www.windfinder.com" target="_blank" rel="noopener">Windfinder</a>,
-        <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a> et
-        <a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environnement Canada (Marine)</a>.
+        <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>
+        et les prévisions d’<a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environnement Canada (Marine)</a>.
       </p>
       <p class="lang-en">
         This site provides a <b>high-level overview</b> of <b>promising windows</b> for <b>wind sports</b> over the coming week,
         based on your <b>personal filters</b> (min gust, wind sectors, tide).
-        Included spots are <b>popular locations around Québec City</b>: Baie de Beauport, Ste-Anne-de-Beaupré,
-        St-Jean (Île d’Orléans), and Ange-Gardien. For <b>detailed forecasts</b>:
-        <a href="https://asvq.ca" target="_blank" rel="noopener">asvq.ca</a>,
+        The included spots are <b>popular locations around Québec City</b>: Baie de Beauport, Ste-Anne-de-Beaupré, St-Jean (Île d’Orléans), and Ange-Gardien.
+        For <b>detailed forecasts</b>, use dedicated Quebec resources like 
+        <a href="https://asvq.ca" target="_blank" rel="noopener">asvq.ca</a> and popular wind apps:
         <a href="https://windy.app" target="_blank" rel="noopener">Windy.app</a>,
         <a href="https://www.windfinder.com" target="_blank" rel="noopener">Windfinder</a>,
-        <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>, and
-        <a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environment Canada Marine</a>.
+        <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>,
+        plus <a href="https://weather.gc.ca/marine/index_e.html" target="_blank" rel="noopener">Environment Canada Marine forecasts</a>.
       </p>
-      <p class="lang-fr"><b>Modèles de vent :</b> Open-Meteo (sélection auto). Modèles courants : <b>HRDPS</b>, <b>NAM</b>, <b>HRRR</b>.</p>
-      <p class="lang-en"><b>Wind models:</b> via Open-Meteo (auto selection). Commonly used: <b>HRDPS</b>, <b>NAM</b>, <b>HRRR</b>.</p>
+
+      <p class="lang-fr">
+        <b>Modèles de vent :</b> données via Open-Meteo (sélection automatique régionale).
+        Les modèles souvent consultés dans notre région incluent <b>HRDPS</b> (haute résolution), <b>NAM</b> et <b>HRRR</b>.
+      </p>
+      <p class="lang-en">
+        <b>Wind models:</b> data is pulled via Open-Meteo (auto selection for the area).
+        Commonly used models here include <b>HRDPS</b> (high-resolution), <b>NAM</b>, and <b>HRRR</b>.
+      </p>
     </div>
   </details>
 
-  <!-- MAP: smaller, above filters, open by default so user can collapse -->
-  <details class="collapsible" id="mapSection" open>
+  <!-- Collapsible: Map -->
+  <details class="collapsible" id="mapSection">
     <summary>Carte / Map</summary>
     <div class="content">
       <div id="mapWrap"><div id="map"></div></div>
       <p class="muted" style="margin-top:6px">
-        <span class="lang-fr">Les secteurs affichés représentent les <b>directions de vent autorisées</b> que vous avez choisies pour le spot actif (le vent souffle <b>depuis</b> ces secteurs).</span><br/>
-        <span class="lang-en">Shown sectors reflect your <b>allowed wind directions</b> for the active spot (wind blows <b>from</b> these sectors).</span>
+        <span class="lang-fr">Les secteurs affichés représentent les <b>directions de vent autorisées</b> que vous avez choisies pour le spot actif. Le vent souffle <b>depuis</b> ces secteurs vers le spot.</span><br/>
+        <span class="lang-en">The shown sectors represent the <b>allowed wind directions</b> you selected for the active spot. Wind blows <b>from</b> these sectors toward the spot.</span>
       </p>
     </div>
   </details>
 
-  <!-- Spot conditions (collapsed by default) -->
+  <!-- Collapsible: Spot conditions (text) -->
   <details class="collapsible">
     <summary>Conditions par site / Spot Conditions</summary>
     <div class="content">
       <ul>
-        <li><span class="lang-fr"><b>Baie de Beauport</b> — par défaut : rafales ≥10 nœuds, toute direction</span><br/>
-            <span class="lang-en"><b>Baie de Beauport</b> — default: gust ≥10 kn, any direction</span></li>
-        <li><span class="lang-fr"><b>Ste-Anne-de-Beaupré</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
-            <span class="lang-en"><b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span></li>
-        <li><span class="lang-fr"><b>St-Jean, Île d’Orléans</b> — par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</span><br/>
-            <span class="lang-en"><b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn</span></li>
-        <li><span class="lang-fr"><b>Ange-Gardien</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
-            <span class="lang-en"><b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span></li>
+        <li>
+          <span class="lang-fr"><b>Baie de Beauport</b> — par défaut : rafales ≥10 nœuds, toute direction</span><br/>
+          <span class="lang-en"><b>Baie de Beauport</b> — default: gust ≥10 kn, any direction</span>
+        </li>
+        <li>
+          <span class="lang-fr"><b>Ste-Anne-de-Beaupré</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>Ste-Anne-de-Beaupré</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
+        </li>
+        <li>
+          <span class="lang-fr"><b>St-Jean, Île d’Orléans</b> — par défaut : NE 30–70°, marée <b>descendante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>St-Jean, Île d’Orléans</b> — default: NE 30–70°, <b>falling</b> tide, gust ≥10 kn</span>
+        </li>
+        <li>
+          <span class="lang-fr"><b>Ange-Gardien</b> — par défaut : SW 200–250°, marée <b>montante</b>, rafales ≥10 nœuds</span><br/>
+          <span class="lang-en"><b>Ange-Gardien</b> — default: SW 200–250°, <b>rising</b> tide, gust ≥10 kn</span>
+        </li>
       </ul>
     </div>
   </details>
 
-  <!-- Tides (collapsed by default) -->
+  <!-- Collapsible: Tides -->
   <details class="collapsible">
     <summary>Marées / Tides</summary>
     <div class="content">
       <p class="muted">
-        <span class="lang-fr">La fine bande colorée à côté de chaque jour indique la phase de marée (vert = montante, rouge = descendante, gris = étale). C’est une <b>approximation</b> basée sur la Baie de Beauport, avec décalages simples pour les autres spots.</span><br/>
-        <span class="lang-en">The thin colored stripe beside each day shows tide phase (green = rising, red = falling, grey = slack). It’s an <b>approximation</b> based on Baie de Beauport with simple offsets for other spots.</span>
+        <span class="lang-fr">La fine bande colorée à côté de chaque jour indique la phase de marée pour ce site (vert = montante, rouge = descendante, gris = étale). Ces phases sont une <b>approximation</b> basée sur la Baie de Beauport, avec des décalages simples pour les sites voisins. Pour des horaires précis, consultez les stations officielles ci-dessous.</span><br/>
+        <span class="lang-en">The thin colored stripe beside each day shows the tide phase for that spot (green = rising, red = falling, grey = slack). These phases are an <b>approximation</b> using Baie de Beauport as a baseline, with simple offsets for nearby spots. For precise timing, use the official stations below.</span>
       </p>
       <ul class="muted">
-        <li><a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">Baie de Beauport — 03250</a></li>
-        <li><a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">Ste-Anne-de-Beaupré — 03087</a></li>
-        <li><a href="https://tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">St-Jean, Île d’Orléans — 03105</a></li>
+        <li>
+          <a href="https://tides.gc.ca/en/stations/03250" target="_blank" rel="noopener">
+            <span class="lang-fr">Baie de Beauport — Station officielle 03250</span>
+            <span class="lang-en">Baie de Beauport — Official station 03250</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://tides.gc.ca/en/stations/03087" target="_blank" rel="noopener">
+            <span class="lang-fr">Ste-Anne-de-Beaupré — Station officielle 03087</span>
+            <span class="lang-en">Ste-Anne-de-Beaupré — Official station 03087</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.tides.gc.ca/en/stations/03105" target="_blank" rel="noopener">
+            <span class="lang-fr">St-Jean, Île d’Orléans — Station officielle 03105</span>
+            <span class="lang-en">St-Jean, Île d’Orléans — Official station 03105</span>
+          </a>
+        </li>
       </ul>
       <p class="muted">
-        <span class="lang-fr">Ange-Gardien : pas de station. Utilisez un horaire approximatif à mi-chemin entre Beauport et Ste-Anne.</span><br/>
-        <span class="lang-en">Ange-Gardien: no station. Use a time roughly midway between Beauport and Ste-Anne.</span>
+        <span class="lang-fr">Ange-Gardien : pas de station dédiée. Pour une estimation rapide, utilisez une heure environ à mi-chemin entre les changements de marée de Ste-Anne-de-Beaupré et de la Baie de Beauport.</span><br/>
+        <span class="lang-en">Ange-Gardien: no dedicated station. For a rough idea, use a time roughly midway between the tide changes at Ste-Anne-de-Beaupré and Baie de Beauport.</span>
       </p>
     </div>
   </details>
 
   <p class="muted">
-    <span class="lang-fr">Basculer <b>Jour (06–21)</b> / <b>24h (00–23)</b>. Colonnes = jours, lignes = heures. Les préférences (rafale min, secteurs, marée) sont enregistrées localement.</span><br/>
-    <span class="lang-en">Toggle <b>Daylight (06–21)</b> / <b>All hours (00–23)</b>. Columns = days, rows = hours. Preferences (min gust, sectors, tide) are saved locally.</span>
+    <span class="lang-fr">Basculer entre <b>Jour (06–21)</b> et <b>24h (00–23)</b>. Les colonnes = jours, les lignes = heures. Utilisez le panneau par site pour définir rafale min, directions permises et phase de marée. Vos préférences sont sauvegardées sur cet appareil.</span><br/>
+    <span class="lang-en">Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Columns are days, rows are hours. Use the per-spot panel to set min gust, allowed directions, and tide phase. Your preferences are saved on this device.</span>
   </p>
 
   <div class="controls">
@@ -126,7 +308,7 @@
     </div>
   </div>
 
-  <!-- Per-spot filters -->
+  <!-- Per-spot settings -->
   <div class="settings-wrap" id="settingsWrap">
     <div class="settings-grid">
       <div class="settings-section">
@@ -159,7 +341,7 @@
     </div>
   </div>
 
-  <!-- Sticky info bar -->
+  <!-- Sticky info bar (updates on tap/click/focus) -->
   <div class="info-bar" id="infoBar">
     <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
   </div>
@@ -179,7 +361,519 @@
 
   <div id="matrices"></div>
 
-  <!-- App logic -->
-  <script src="script.js"></script>
+  <script>
+  (async function(){
+    // ---------- Config ----------
+    let VIEW = 'daylight'; // 'daylight' | 'all'
+    const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
+    const TZ = 'America/Toronto';
+
+    // Spots for MAP DISPLAY ONLY (forecast values come from forecast.json)
+    const spots = [
+      {key:'beauport',     label:'Baie de Beauport',            lat:46.83938157700642,  lon:-71.18913476445113},
+      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré',         lat:47.0153,            lon:-70.9280},
+      {key:'st_jean',      label:'St-Jean, Île d’Orléans',      lat:46.915308,          lon:-70.89627},
+      {key:'ange_gardien', label:'Ange-Gardien',                lat:46.907944,          lon:-71.090028},
+    ];
+    const spotByKey = Object.fromEntries(spots.map(s=>[s.key,s]));
+
+    // 16-point sectors
+    const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    const SECTOR_CENTERS = {
+      'N':0,'NNE':22.5,'NE':45,'ENE':67.5,'E':90,'ESE':112.5,'SE':135,'SSE':157.5,
+      'S':180,'SSW':202.5,'SW':225,'WSW':247.5,'W':270,'WNW':292.5,'NW':315,'NNW':337.5
+    };
+
+    // Defaults per spot
+    const defaultSettings = {
+      beauport:     { min:10, dirs: new Set(SECTORS),                tides: new Set(['rising','falling']) },
+      ste_anne:     { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
+      st_jean:      { min:10, dirs: new Set(['NNE','NE','ENE']),     tides: new Set(['falling']) },
+      ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
+    };
+
+    // ---------- DOM refs ----------
+    const tabBar   = document.getElementById('tabs');
+    const matrices = document.getElementById('matrices');
+    const infoBar  = document.getElementById('infoBar');
+    const gustSel  = document.getElementById('minGustSelect');
+    const dirGrid  = document.getElementById('dirGrid');
+    const tideRise = document.getElementById('tideRise');
+    const tideFall = document.getElementById('tideFall');
+    const btnDay   = document.getElementById('tgl-daylight');
+    const btnAll   = document.getElementById('tgl-all');
+
+    // ---------- Helpers ----------
+    const toLocal = s => new Date(s);
+    const dayKey = d => d.toLocaleDateString('en-CA', { timeZone: TZ });
+    const dayLabel = d => d.toLocaleDateString('fr-CA', { weekday:'short', month:'short', day:'2-digit', timeZone:TZ });
+    const hourStr = d => d.toLocaleString('en-CA',{ hour:'2-digit', hour12:false, timeZone:TZ });
+
+    function degToCardinal16(deg){
+      if (deg==null || isNaN(deg)) return '';
+      const dirs = SECTORS;
+      const ix = Math.round(((deg%360)/22.5)) % 16;
+      return dirs[ix];
+    }
+    function arrowSVG(deg, size=12){
+      if (deg==null || isNaN(deg)) return '';
+      const rot = (180 + Number(deg)) % 360; // FROM direction
+      return `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${rot}deg);width:${size}px;height:${size}px">
+        <path d="M12 4 L8 10 H11 V20 H13 V10 H16 Z" fill="currentColor"></path>
+      </svg>`;
+    }
+    function sectorOf(deg){
+      if (deg==null || isNaN(deg)) return null;
+      const i = Math.round(((deg%360)/22.5)) % 16;
+      return SECTORS[i];
+    }
+    function strengthColor(kn){
+      if (kn == null || isNaN(kn)) return 'var(--neutral)';
+      const v = Number(kn);
+      if (v >= 30) return 'var(--r2)';
+      if (v >= 25) return 'var(--r1)';
+      if (v >= 21) return 'var(--y2)';
+      if (v >= 18) return 'var(--y1)';
+      if (v >= 14) return 'var(--g2)';
+      return 'var(--g1)'; // 10–14
+    }
+    function tideStripeColor(state){
+      const s = (state||'').toLowerCase();
+      if (s==='rising')  return 'var(--tide-rise)';
+      if (s==='falling') return 'var(--tide-fall)';
+      if (s==='slack')   return 'var(--tide-slack)';
+      return 'var(--tide-unk)';
+    }
+
+    // ---------- Load forecast.json ----------
+    let data;
+    try{
+      data = await fetch('forecast.json?v=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
+    }catch(e){
+      document.body.insertAdjacentHTML('beforeend',
+        '<p style="color:#b00"><span class="lang-fr">Impossible de charger</span> / <span class="lang-en">Could not load</span> forecast.json.</p>');
+      return;
+    }
+    const hours = data.hours || [];
+    if (!hours.length){
+      document.body.insertAdjacentHTML('beforeend',
+        '<p class="muted"><span class="lang-fr">Aucune donnée pour le moment.</span> / <span class="lang-en">No data yet.</span></p>');
+      return;
+    }
+
+    // ---------- Group by day ----------
+    const byDayAll = new Map();
+    for(const row of hours){
+      const t = toLocal(row.time);
+      const k = dayKey(t);
+      if(!byDayAll.has(k)) byDayAll.set(k, []);
+      byDayAll.get(k).push(row);
+    }
+    for(const arr of byDayAll.values()){
+      arr.sort((a,b)=> new Date(a.time)-new Date(b.time));
+    }
+    const dayOrder = Array.from(byDayAll.keys()).sort((a,b)=> new Date(a)-new Date(b));
+
+    // ---------- Per-spot settings (saved in localStorage) ----------
+    const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // 8..25 inclusive
+    function loadSettings(spotKey){
+      const raw = localStorage.getItem('wf_settings_'+spotKey);
+      if(!raw) return structuredClone(defaultSettings[spotKey]);
+      try{
+        const o = JSON.parse(raw);
+        return {
+          min: o.min ?? defaultSettings[spotKey].min,
+          dirs: new Set(o.dirs ?? Array.from(defaultSettings[spotKey].dirs)),
+          tides: new Set(o.tides ?? Array.from(defaultSettings[spotKey].tides)),
+        };
+      }catch(_){ return structuredClone(defaultSettings[spotKey]); }
+    }
+    function saveSettings(spotKey, s){
+      localStorage.setItem('wf_settings_'+spotKey, JSON.stringify({
+        min: s.min, dirs: Array.from(s.dirs), tides: Array.from(s.tides)
+      }));
+    }
+    let settings = {
+      beauport:loadSettings('beauport'),
+      ste_anne:loadSettings('ste_anne'),
+      st_jean:loadSettings('st_jean'),
+      ange_gardien:loadSettings('ange_gardien')
+    };
+    let currentSpot = 'beauport';
+
+    // Fill UI choices
+    MIN_KN_OPTIONS.forEach(v=>{
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v + ' kn';
+      gustSel.appendChild(opt);
+    });
+    SECTORS.forEach(sec=>{
+      const div = document.createElement('div');
+      div.className = 'chip';
+      div.textContent = sec;
+      div.dataset.sec = sec;
+      dirGrid.appendChild(div);
+    });
+
+    function refreshSettingsPanel(){
+      const s = settings[currentSpot];
+      gustSel.value = s.min;
+      [...dirGrid.children].forEach(ch=>{
+        ch.classList.toggle('on', s.dirs.has(ch.dataset.sec));
+      });
+      tideRise.checked = s.tides.has('rising');
+      tideFall.checked = s.tides.has('falling');
+      drawSpotSectorsOnMap(currentSpot);
+    }
+
+    // Direction chip clicks
+    dirGrid.addEventListener('click', (e)=>{
+      const chip = e.target.closest('.chip');
+      if(!chip) return;
+      const s = settings[currentSpot];
+      const sec = chip.dataset.sec;
+      if(s.dirs.has(sec)) s.dirs.delete(sec); else s.dirs.add(sec);
+      chip.classList.toggle('on');
+      saveSettings(currentSpot, s);
+      render(VIEW);
+      drawSpotSectorsOnMap(currentSpot);
+    });
+
+    // Presets
+    document.querySelectorAll('.preset').forEach(p=>{
+      p.addEventListener('click', ()=>{
+        const which = p.dataset.preset;
+        const s = settings[currentSpot];
+        if(which==='any'){ s.dirs = new Set(SECTORS); }
+        else if(which==='sw'){ s.dirs = new Set(['SSW','SW','WSW']); }
+        else if(which==='ne'){ s.dirs = new Set(['NNE','NE','ENE']); }
+        else if(which==='none'){ s.dirs = new Set(); }
+        saveSettings(currentSpot, s);
+        refreshSettingsPanel();
+        render(VIEW);
+        drawSpotSectorsOnMap(currentSpot);
+      });
+    });
+
+    // Gust select & tide checkboxes
+    gustSel.addEventListener('change', ()=>{
+      const s = settings[currentSpot];
+      s.min = Number(gustSel.value);
+      saveSettings(currentSpot, s);
+      render(VIEW);
+    });
+    tideRise.addEventListener('change', ()=>{
+      const s = settings[currentSpot];
+      if(tideRise.checked) s.tides.add('rising'); else s.tides.delete('rising');
+      saveSettings(currentSpot, s);
+      render(VIEW);
+    });
+    tideFall.addEventListener('change', ()=>{
+      const s = settings[currentSpot];
+      if(tideFall.checked) s.tides.add('falling'); else s.tides.delete('falling');
+      saveSettings(currentSpot, s);
+      render(VIEW);
+    });
+
+    // ---------- Tabs ----------
+    spots.forEach((s,i)=>{
+      const tab = document.createElement('button');
+      tab.className = 'tab' + (i===0?' active':'');
+      tab.textContent = s.label;
+      tab.dataset.target = s.key;
+      tabBar.appendChild(tab);
+    });
+
+    // ---------- Rules check ----------
+    function meetsUserRules(spotKey, gust, dir_deg, tide){
+      const s = settings[spotKey];
+      // gust
+      if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;
+      // direction (if none selected -> treat as ANY)
+      if (dir_deg != null && !isNaN(dir_deg)) {
+        const sec = sectorOf(Number(dir_deg));
+        if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;
+      } else {
+        return false;
+      }
+      // tide
+      const t = String(tide||'unknown').toLowerCase();
+      if (s.tides.size > 0 && !s.tides.has(t)) return false;
+      return true;
+    }
+
+    // ---------- Build one matrix ----------
+    function buildMatrix(spotKey, mode){
+      const [HSTART, HEND] = (mode==='daylight' ? [6,21] : [0,23]);
+
+      const container = document.createElement('div');
+      container.className = 'matrix-wrap';
+      const tbl = document.createElement('table');
+
+      // Header row
+      const thead = document.createElement('thead');
+      const htr = document.createElement('tr');
+
+      const corner = document.createElement('th');
+      corner.className = 'hour';
+      corner.textContent = 'Heure / Hour';
+      htr.appendChild(corner);
+
+      dayOrder.forEach(dk=>{
+        const thStripe = document.createElement('th');
+        thStripe.className = 'tideStripeHead';
+        htr.appendChild(thStripe);
+
+        const th = document.createElement('th');
+        th.className = 'day';
+        const dt = new Date(dk + 'T00:00:00-04:00');
+        th.innerHTML = `<div class="day-head"><div class="date">${dayLabel(dt)}</div></div>`;
+        htr.appendChild(th);
+      });
+      thead.appendChild(htr);
+      tbl.appendChild(thead);
+
+      // Map day->hour->spot object
+      const map = {};
+      dayOrder.forEach(k=>{
+        map[k] = {};
+        const arr = byDayAll.get(k) || [];
+        arr.forEach(row=>{
+          const h = hourStr(new Date(row.time));
+          map[k][h] = row[spotKey] || {};
+        });
+      });
+
+      // Body rows
+      const tbody = document.createElement('tbody');
+      for(let hour=HSTART; hour<=HEND; hour++){
+        const hrStr = hour.toString().padStart(2,'0');
+        const tr = document.createElement('tr');
+
+        const th = document.createElement('th');
+        th.className = 'hour';
+        th.innerHTML = `<span class="hour-label">${hrStr}</span>`;
+        tr.appendChild(th);
+
+        dayOrder.forEach(dk=>{
+          const obj = (map[dk] && map[dk][hrStr]) ? map[dk][hrStr] : {};
+          const tideState = (obj && obj.tide) ? obj.tide : 'unknown';
+
+          // tide stripe cell
+          const tdStripe = document.createElement('td');
+          tdStripe.className = 'tideStripe';
+          tdStripe.style.background = tideStripeColor(tideState);
+          tr.appendChild(tdStripe);
+
+          // data cell
+          const td = document.createElement('td');
+          let bg;
+          if (obj.wind_kn == null) {
+            bg = 'var(--neutral)';           // missing data
+          } else if (meetsUserRules(spotKey, obj.wind_kn, obj.dir_deg, tideState)) {
+            bg = strengthColor(obj.wind_kn); // meets criteria -> color by gust strength
+          } else {
+            bg = 'var(--blank)';             // criteria not met -> blank
+          }
+
+          const gust = (obj.wind_kn == null ? '-' : obj.wind_kn);
+          const avg  = obj.wind_avg_kn;
+          const deg  = obj.dir_deg;
+          const card = deg==null ? '' : degToCardinal16(deg);
+          const tip  = `${dk} ${hrStr}:00 — gust ${gust} kn${avg!=null?`, avg ${avg} kn`:''}${card?` (${card}${deg!=null?` ${deg}°`:''})`:''} • tide: ${tideState}`;
+
+          td.innerHTML = `<div class="cell" title="${tip}" tabindex="0" role="button"
+              data-spot="${spotKey}"
+              data-day="${dk}"
+              data-hour="${hrStr}"
+              data-gust="${gust}"
+              data-avg="${avg==null?'':avg}"
+              data-deg="${deg==null?'':deg}"
+              data-card="${card}"
+              data-tide="${tideState}"
+            >${deg!=null ? arrowSVG(deg) : ''}</div>`;
+          td.querySelector('.cell').style.background = bg;
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      }
+
+      tbl.appendChild(tbody);
+      container.appendChild(tbl);
+      return container;
+    }
+
+    // ---------- Render all spot views ----------
+    function render(mode){
+      matrices.innerHTML = '';
+      const views = {};
+
+      spots.forEach((s,i)=>{
+        const v = buildMatrix(s.key, mode);
+        v.style.display = i===0 ? 'block':'none';
+        v.id = 'view-'+s.key;
+        matrices.appendChild(v);
+        views[s.key] = v;
+
+        // cell interactions
+        v.addEventListener('click', onCellActivate);
+        v.addEventListener('keydown', (ev)=>{
+          if(ev.key==='Enter' || ev.key===' '){
+            const el = ev.target.closest('.cell');
+            if(el){ ev.preventDefault(); onCellActivate(ev); }
+          }
+        });
+      });
+
+      // Tab switching
+      tabBar.onclick = (e)=>{
+        const btn = e.target.closest('.tab');
+        if(!btn) return;
+        [...tabBar.children].forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.dataset.target;
+        Object.values(views).forEach(v=>v.style.display='none');
+        views[target].style.display = 'block';
+        currentSpot = target;
+        refreshSettingsPanel();
+        infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
+        centerMapOnSpot(target);
+        drawSpotSectorsOnMap(target);
+      };
+    }
+
+    // ---------- Info bar from cell ----------
+    function onCellActivate(ev){
+      const cell = ev.target.closest('.cell');
+      if(!cell) return;
+      const dk = cell.dataset.day;
+      const hr = cell.dataset.hour;
+      const gust = cell.dataset.gust || '-';
+      const avg  = cell.dataset.avg ? `${cell.dataset.avg} kn` : '';
+      const deg  = cell.dataset.deg;
+      const card = cell.dataset.card || '';
+      const tide = (cell.dataset.tide || 'unknown');
+      const arrow = (deg ? arrowSVG(deg,18) : '');
+      infoBar.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div><b>${dk}</b> ${hr}:00</div>
+          <div>• <span class="lang-fr">Rafale</span> / <span class="lang-en">Gust</span>: <b>${gust} kn</b>${avg?` (avg ${avg})`:''}</div>
+          <div>• <span class="lang-fr">Direction</span> / <span class="lang-en">Dir</span>: <b>${card}${deg?` ${deg}°`:''}</b> ${arrow}</div>
+          <div>• <span class="lang-fr">Marée</span> / <span class="lang-en">Tide</span>: <b>${tide}</b></div>
+        </div>`;
+    }
+
+    // ---------- Map ----------
+    const mapEl = document.getElementById('map');
+    const map = L.map(mapEl, { zoomControl:true, attributionControl:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
+    }).addTo(map);
+    let marker = null;
+    let sectorLayers = [];
+
+    function centerMapOnSpot(spotKey){
+      const s = spotByKey[spotKey];
+      if(!s) return;
+      map.setView([s.lat, s.lon], 12);
+      if (marker) { map.removeLayer(marker); }
+      marker = L.marker([s.lat, s.lon]).addTo(map).bindPopup(s.label);
+    }
+
+    // Sector maths
+    function destPoint(lat, lon, brgDeg, distKm){
+      const R = 6371.0088;
+      const δ = distKm / R;
+      const φ1 = lat * Math.PI/180;
+      const λ1 = lon * Math.PI/180;
+      const θ = brgDeg * Math.PI/180;
+      const sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1);
+      const sinδ = Math.sin(δ), cosδ = Math.cos(δ);
+      const sinφ2 = sinφ1*cosδ + cosφ1*sinδ*Math.cos(θ);
+      const φ2 = Math.asin(sinφ2);
+      const y = Math.sin(θ)*sinδ*cosφ1;
+      const x = cosδ - sinφ1*sinφ2;
+      const λ2 = λ1 + Math.atan2(y, x);
+      return [φ2*180/Math.PI, ((λ2*180/Math.PI+540)%360)-180];
+    }
+    function drawSector(lat, lon, startDeg, endDeg, radiusKm=8, steps=40){
+      const pts = [];
+      pts.push([lat,lon]);
+      const sweep = ((endDeg - startDeg + 360) % 360);
+      const step = Math.max(1, Math.round(sweep/steps));
+      for(let d=0; d<=sweep; d+=step){
+        const brg = (startDeg + d) % 360;
+        pts.push(destPoint(lat, lon, brg, radiusKm));
+      }
+      pts.push(destPoint(lat, lon, endDeg, radiusKm));
+      pts.push([lat,lon]);
+      return L.polygon(pts, {color:'#0a5', weight:1, fillColor:'#0a5', fillOpacity:0.18});
+    }
+    function clearSectors(){ sectorLayers.forEach(l=> map.removeLayer(l)); sectorLayers = []; }
+    function dirsToRanges(dirSet){
+      if (!dirSet || dirSet.size===0) return [];
+      const spans = Array.from(dirSet).map(name=>{
+        const c = SECTOR_CENTERS[name];
+        return [(c-11.25+360)%360, (c+11.25)%360];
+      });
+      const covered = new Array(360).fill(false);
+      spans.forEach(([a,b])=>{
+        if(a<=b){
+          for(let d=Math.floor(a); d<=Math.ceil(b); d++) covered[(d+360)%360]=true;
+        }else{
+          for(let d=Math.floor(a); d<360; d++) covered[d]=true;
+          for(let d=0; d<=Math.ceil(b); d++) covered[d]=true;
+        }
+      });
+      const ranges=[];
+      let inRun=false, start=0;
+      for(let d=0; d<360; d++){
+        if(covered[d] && !inRun){ inRun=true; start=d; }
+        if(!covered[d] && inRun){ inRun=false; ranges.push([start, d-1]); }
+      }
+      if(inRun) ranges.push([start, 359]);
+      if(ranges.length>1 && ranges[0][0]===0 && ranges[ranges.length-1][1]===359){
+        const last = ranges.pop();
+        ranges[0][0] = last[0];
+      }
+      return ranges;
+    }
+    function drawSpotSectorsOnMap(spotKey){
+      const s = spotByKey[spotKey];
+      if(!s) return;
+      clearSectors();
+      const dirs = settings[spotKey].dirs;
+      const ranges = dirsToRanges(dirs);
+      ranges.forEach(([a,b])=>{
+        const poly = drawSector(s.lat, s.lon, a, b, 8, 40);
+        poly.addTo(map);
+        sectorLayers.push(poly);
+      });
+    }
+
+    // Map initial state & collapsible sizing
+    map.setView([46.88, -71.05], 10);
+    centerMapOnSpot('beauport');
+    drawSpotSectorsOnMap('beauport');
+    document.getElementById('mapSection').addEventListener('toggle', ()=>{
+      setTimeout(()=> map.invalidateSize(), 200);
+    });
+
+    // ---------- View toggles ----------
+    function setToggle(active){
+      btnDay.classList.toggle('active', active==='daylight');
+      btnAll.classList.toggle('active', active==='all');
+    }
+    btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
+    btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
+
+    // ---------- First paint ----------
+    refreshSettingsPanel();
+    render(VIEW);
+
+  })();
+  </script>
 </body>
 </html>

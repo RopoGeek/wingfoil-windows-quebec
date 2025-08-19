@@ -369,12 +369,12 @@
     let VIEW = 'daylight'; // 'daylight' | 'all'
     const HOUR_RANGE = { daylight:[6,21], all:[0,23] };
 
-    // Spots + coordinates (for the map)
+    // Spots + coordinates (for the map ONLY; forecast uses forecast.json)
     const spots = [
-      {key:'beauport',     label:'Baie de Beauport',            lat:46.8598,  lon:-71.2006},
-      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré',         lat:47.0153,  lon:-70.9280},
-      {key:'st_jean',      label:'St-Jean, Île d’Orléans',      lat:46.915308,  lon:-70.89627},
-      {key:'ange_gardien', label:'Ange-Gardien',                lat:46.907944,lon:-71.090028},
+      {key:'beauport',     label:'Baie de Beauport',            lat:46.83938157700642,  lon:-71.18913476445113},
+      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré',         lat:47.0153,            lon:-70.9280},
+      {key:'st_jean',      label:'St-Jean, Île d’Orléans',      lat:46.915308,          lon:-70.89627},
+      {key:'ange_gardien', label:'Ange-Gardien',                lat:46.907944,          lon:-71.090028},
     ];
     const spotByKey = Object.fromEntries(spots.map(s=>[s.key,s]));
 
@@ -812,6 +812,8 @@
       'N':0,'NNE':22.5,'NE':45,'ENE':67.5,'E':90,'ESE':112.5,'SE':135,'SSE':157.5,
       'S':180,'SSW':202.5,'SW':225,'WSW':247.5,'W':270,'WNW':292.5,'NW':315,'NNW':337.5
     };
+    const SECTORS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; // re-declare for clarity
+
     function dirsToRanges(dirSet){
       if (!dirSet || dirSet.size===0) return [];
       // Each sector spans ±11.25° around its center
@@ -879,6 +881,7 @@
       return L.polygon(pts, {color:'#0a5', weight:1, fillColor:'#0a5', fillOpacity:0.18});
     }
 
+    let sectorLayers = []; // polygons
     function clearSectors(){
       sectorLayers.forEach(l=> map.removeLayer(l));
       sectorLayers = [];
@@ -899,23 +902,50 @@
     }
 
     // Center & draw current spot on first load
+    function centerMapOnSpot(spotKey){
+      const s = spotByKey[spotKey];
+      if(!s) return;
+      map.setView([s.lat, s.lon], 12);
+      if (window._marker) { map.removeLayer(window._marker); }
+      window._marker = L.marker([s.lat, s.lon]).addTo(map).bindPopup(s.label);
+    }
     centerMapOnSpot('beauport');
     drawSpotSectorsOnMap('beauport');
 
     // Init settings UI and first render
     const btnDay = document.getElementById('tgl-daylight');
     const btnAll = document.getElementById('tgl-all');
+
+    const MIN_KN_OPTIONS = Array.from({length:18}, (_,i)=> i+8); // already declared above but used for select fill earlier
+
+    const gustSel = document.getElementById('minGustSelect');
+    const dirGrid = document.getElementById('dirGrid');
+    const tideRise = document.getElementById('tideRise');
+    const tideFall = document.getElementById('tideFall');
+
     function setToggle(active){
       btnDay.classList.toggle('active', active==='daylight');
       btnAll.classList.toggle('active', active==='all');
     }
+    function refreshSettingsPanel(){
+      const s = settings[currentSpot];
+      gustSel.value = s.min;
+      [...dirGrid.children].forEach(ch=>{
+        ch.classList.toggle('on', s.dirs.has(ch.dataset.sec));
+      });
+      tideRise.checked = s.tides.has('rising');
+      tideFall.checked = s.tides.has('falling');
+      drawSpotSectorsOnMap(currentSpot);
+    }
+
     refreshSettingsPanel();
     render(VIEW);
     btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
     btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
 
+    // Tab switching handled in render()
+
   })();
   </script>
 </body>
 </html>
-

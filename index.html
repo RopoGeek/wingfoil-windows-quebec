@@ -119,9 +119,7 @@
     .settings-section h3{ margin:0 0 6px; font-size:14px }
     .select, .checkboxes{ font-size:14px }
     select{ padding:6px 8px; border:1px solid #ccc; border-radius:8px; background:#fff; }
-    .dir-grid{
-      display:grid; grid-template-columns: repeat(8, minmax(56px,1fr)); gap:6px;
-    }
+    .dir-grid{ display:grid; grid-template-columns: repeat(8, minmax(56px,1fr)); gap:6px; }
     .chip{
       user-select:none;
       padding:6px 6px; border:1px solid var(--chip-border); border-radius:8px;
@@ -137,6 +135,7 @@
       display:flex; align-items:center; gap:10px;
       padding:8px 10px; border:1px solid var(--grid-border); border-radius:10px;
       background:#fffffe; box-shadow: 0 1px 0 rgba(0,0,0,0.02); font-size:14px; min-height:36px;
+      margin: 8px 0;
     }
     .info-bar .arrow{width:18px;height:18px}
     .info-dim{color:var(--muted)}
@@ -275,7 +274,7 @@
     </div>
   </div>
 
-  <!-- Sticky info bar -->
+  <!-- Single sticky info bar -->
   <div class="info-bar" id="infoBar">
     <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
   </div>
@@ -338,11 +337,6 @@
     <span class="swatch c-blank"></span> <span class="lang-fr">Critères non remplis</span> / <span class="lang-en">Criteria not met</span>
   </div>
 
-  <!-- Sticky info bar -->
-  <div class="info-bar" id="infoBar">
-    <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
-  </div>
-
   <div id="matrices"></div>
 
   <script>
@@ -376,7 +370,7 @@
       ange_gardien: { min:10, dirs: new Set(['SSW','SW','WSW']),     tides: new Set(['rising']) },
     };
 
-    // ---------- DOM refs (declare ONCE) ----------
+    // ---------- DOM refs ----------
     const tabBar   = document.getElementById('tabs');
     const matrices = document.getElementById('matrices');
     const infoBar  = document.getElementById('infoBar');
@@ -560,30 +554,30 @@
       render(VIEW);
     });
 
-    // ---------- Tabs ----------
-    const spotsList = [
-      {key:'beauport',     label:'Baie de Beauport'},
-      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
-      {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
-      {key:'ange_gardien', label:'Ange-Gardien'},
-    ];
-    spotsList.forEach((s,i)=>{
+    // ---------- Tabs (build ONCE here) ----------
+    ['beauport','ste_anne','st_jean','ange_gardien'].forEach((key,i)=>{
+      const label = spotByKey[key].label;
       const tab = document.createElement('button');
       tab.className = 'tab' + (i===0?' active':'');
-      tab.textContent = s.label;
-      tab.dataset.target = s.key;
+      tab.textContent = label;
+      tab.dataset.target = key;
       tabBar.appendChild(tab);
     });
 
     // ---------- Rules check ----------
+    function sectorOf(deg){
+      if (deg==null || isNaN(deg)) return null;
+      const i = Math.round(((deg%360)/22.5)) % 16;
+      return SECTORS[i];
+    }
     function meetsUserRules(spotKey, gust, dir_deg, tide){
       const s = settings[spotKey];
-      if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;      // gust
-      if (dir_deg == null || isNaN(dir_deg)) return false;                                 // direction missing
+      if (gust == null || isNaN(gust) || Number(gust) < Number(s.min)) return false;
+      if (dir_deg == null || isNaN(dir_deg)) return false;
       const sec = sectorOf(Number(dir_deg));
-      if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;                               // direction filter
+      if (s.dirs.size > 0 && !s.dirs.has(sec)) return false;
       const t = String(tide||'unknown').toLowerCase();
-      if (s.tides.size > 0 && !s.tides.has(t)) return false;                               // tide filter
+      if (s.tides.size > 0 && !s.tides.has(t)) return false;
       return true;
     }
 
@@ -799,7 +793,7 @@
       });
     }
 
-    // Map initial state & collapsible sizing
+    // Map initial
     map.setView([46.88, -71.05], 10);
     centerMapOnSpot('beauport');
     drawSpotSectorsOnMap('beauport');
@@ -815,14 +809,21 @@
     btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
     btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
 
-    // ---------- Tabs build ----------
-    ['beauport','ste_anne','st_jean','ange_gardien'].forEach((key,i)=>{
-      const label = spotByKey[key].label;
-      const tab = document.createElement('button');
-      tab.className = 'tab' + (i===0?' active':'');
-      tab.textContent = label;
-      tab.dataset.target = key;
-      tabBar.appendChild(tab);
+    // ---------- Tabs switching ----------
+    tabBar.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.tab');
+      if(!btn) return;
+      [...tabBar.children].forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.target;
+      document.querySelectorAll('[id^="view-"]').forEach(v=> v.style.display='none');
+      const view = document.getElementById('view-'+target);
+      if(view) view.style.display = 'block';
+      currentSpot = target;
+      refreshSettingsPanel();
+      infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
+      centerMapOnSpot(target);
+      drawSpotSectorsOnMap(target);
     });
 
     // ---------- Render all spot views ----------
@@ -846,25 +847,22 @@
           }
         });
       });
-
-      // Tab switching
-      tabBar.onclick = (e)=>{
-        const btn = e.target.closest('.tab');
-        if(!btn) return;
-        [...tabBar.children].forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        const target = btn.dataset.target;
-        Object.values(views).forEach(v=>v.style.display='none');
-        views[target].style.display = 'block';
-        currentSpot = target;
-        refreshSettingsPanel();
-        infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
-        centerMapOnSpot(target);
-        drawSpotSectorsOnMap(target);
-      };
     }
 
     // ---------- First paint ----------
+    // Build tabs (must happen before render so switching finds views)
+    ['beauport','ste_anne','st_jean','ange_gardien'].forEach((key,i)=>{
+      const label = spotByKey[key].label;
+      const tab = document.createElement('button');
+      tab.className = 'tab' + (i===0?' active':'');
+      tab.textContent = label;
+      tab.dataset.target = key;
+      // Only append if not already present (safety)
+      if (![...tabBar.children].some(b=>b.dataset.target===key)) {
+        tabBar.appendChild(tab);
+      }
+    });
+
     refreshSettingsPanel();
     render(VIEW);
 

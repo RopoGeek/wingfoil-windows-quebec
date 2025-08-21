@@ -12,7 +12,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_CA">
   <meta property="og:site_name" content="WIND-FILTRATOR">
-  <!-- Auto-refresh page hourly (matches your data refresh cadence) -->
+  <!-- Auto-refresh page hourly -->
   <meta http-equiv="refresh" content="3600" />
 
   <!-- Favicon (optional): place favicon.ico at repo root -->
@@ -171,9 +171,9 @@
 
     a{ color:#0a5; text-decoration:underline; }
 
-    /* Map section */
+    /* Map section (smaller) */
     #mapWrap{ border:1px solid var(--grid-border); border-radius:10px; background:#fff; padding:8px; }
-    #map{ height: 360px; width: 100%; border-radius:8px; }
+    #map{ height: 260px; width: 100%; border-radius:8px; } /* smaller height */
     .leaflet-container a{ color:#0a5; }
   </style>
 </head>
@@ -223,8 +223,16 @@
     </div>
   </details>
 
-  <!-- Collapsible: Map -->
-  <details class="collapsible" id="mapSection">
+  <div class="controls">
+    <div class="tabs" id="tabs"></div>
+    <div class="viewtoggles">
+      <button class="toggle active" id="tgl-daylight"><span class="lang-fr">Jour</span> / <span class="lang-en">Daylight</span></button>
+      <button class="toggle" id="tgl-all"><span class="lang-fr">24h</span> / <span class="lang-en">All hours</span></button>
+    </div>
+  </div>
+
+  <!-- Map moved here: above filters; open by default and smaller -->
+  <details class="collapsible" id="mapSection" open>
     <summary>Carte / Map</summary>
     <div class="content">
       <div id="mapWrap"><div id="map"></div></div>
@@ -234,6 +242,44 @@
       </p>
     </div>
   </details>
+
+  <!-- Per-spot settings (filters) -->
+  <div class="settings-wrap" id="settingsWrap">
+    <div class="settings-grid">
+      <div class="settings-section">
+        <h3><span class="lang-fr">Rafale min (nœuds)</span> / <span class="lang-en">Minimum gust (kn)</span></h3>
+        <select id="minGustSelect"></select>
+      </div>
+
+      <div class="settings-section">
+        <h3><span class="lang-fr">Directions permises</span> / <span class="lang-en">Allowed directions</span></h3>
+        <div class="dir-grid" id="dirGrid"></div>
+        <div class="preset-row">
+          <span class="preset" data-preset="any"><span class="lang-fr">Toutes</span> / <span class="lang-en">Any</span></span>
+          <span class="preset" data-preset="sw">SW 200–250°</span>
+          <span class="preset" data-preset="ne">NE 30–70°</span>
+          <span class="preset" data-preset="none"><span class="lang-fr">Effacer</span> / <span class="lang-en">Clear</span></span>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3><span class="lang-fr">Marée</span> / <span class="lang-en">Tide</span></h3>
+        <div class="checkboxes">
+          <label><input type="checkbox" id="tideRise"> <span class="lang-fr">Montante</span> / <span class="lang-en">Rising</span></label><br/>
+          <label><input type="checkbox" id="tideFall"> <span class="lang-fr">Descendante</span> / <span class="lang-en">Falling</span></label>
+        </div>
+        <p class="muted" style="margin-top:6px">
+          <span class="lang-fr">Si les deux sont désactivées, la marée est ignorée. Si les deux sont activées, l’une ou l’autre phase est acceptée.</span><br/>
+          <span class="lang-en">If both are off, tide is ignored. If both are on, either phase is allowed.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticky info bar (updates on tap/click/focus) -->
+  <div class="info-bar" id="infoBar">
+    <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
+  </div>
 
   <!-- Collapsible: Spot conditions (text) -->
   <details class="collapsible">
@@ -295,57 +341,6 @@
     </div>
   </details>
 
-  <p class="muted">
-    <span class="lang-fr">Basculer entre <b>Jour (06–21)</b> et <b>24h (00–23)</b>. Les colonnes = jours, les lignes = heures. Utilisez le panneau par site pour définir rafale min, directions permises et phase de marée. Vos préférences sont sauvegardées sur cet appareil.</span><br/>
-    <span class="lang-en">Toggle <b>Daylight (06–21)</b> vs <b>All hours (00–23)</b>. Columns are days, rows are hours. Use the per-spot panel to set min gust, allowed directions, and tide phase. Your preferences are saved on this device.</span>
-  </p>
-
-  <div class="controls">
-    <div class="tabs" id="tabs"></div>
-    <div class="viewtoggles">
-      <button class="toggle active" id="tgl-daylight"><span class="lang-fr">Jour</span> / <span class="lang-en">Daylight</span></button>
-      <button class="toggle" id="tgl-all"><span class="lang-fr">24h</span> / <span class="lang-en">All hours</span></button>
-    </div>
-  </div>
-
-  <!-- Per-spot settings -->
-  <div class="settings-wrap" id="settingsWrap">
-    <div class="settings-grid">
-      <div class="settings-section">
-        <h3><span class="lang-fr">Rafale min (nœuds)</span> / <span class="lang-en">Minimum gust (kn)</span></h3>
-        <select id="minGustSelect"></select>
-      </div>
-
-      <div class="settings-section">
-        <h3><span class="lang-fr">Directions permises</span> / <span class="lang-en">Allowed directions</span></h3>
-        <div class="dir-grid" id="dirGrid"></div>
-        <div class="preset-row">
-          <span class="preset" data-preset="any"><span class="lang-fr">Toutes</span> / <span class="lang-en">Any</span></span>
-          <span class="preset" data-preset="sw">SW 200–250°</span>
-          <span class="preset" data-preset="ne">NE 30–70°</span>
-          <span class="preset" data-preset="none"><span class="lang-fr">Effacer</span> / <span class="lang-en">Clear</span></span>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3><span class="lang-fr">Marée</span> / <span class="lang-en">Tide</span></h3>
-        <div class="checkboxes">
-          <label><input type="checkbox" id="tideRise"> <span class="lang-fr">Montante</span> / <span class="lang-en">Rising</span></label><br/>
-          <label><input type="checkbox" id="tideFall"> <span class="lang-fr">Descendante</span> / <span class="lang-en">Falling</span></label>
-        </div>
-        <p class="muted" style="margin-top:6px">
-          <span class="lang-fr">Si les deux sont désactivées, la marée est ignorée. Si les deux sont activées, l’une ou l’autre phase est acceptée.</span><br/>
-          <span class="lang-en">If both are off, tide is ignored. If both are on, either phase is allowed.</span>
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sticky info bar (updates on tap/click/focus) -->
-  <div class="info-bar" id="infoBar">
-    <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
-  </div>
-
   <!-- Legend -->
   <div class="legend">
     <span class="swatch c-g1"></span> <span class="lang-fr">10–14 nœuds</span> / <span class="lang-en">10–14 kn</span>
@@ -357,6 +352,11 @@
     &nbsp; | &nbsp;
     <span class="swatch c-neutral"></span> <span class="lang-fr">Données manquantes</span> / <span class="lang-en">Missing data</span>
     <span class="swatch c-blank"></span> <span class="lang-fr">Critères non remplis</span> / <span class="lang-en">Criteria not met</span>
+  </div>
+
+  <!-- Sticky info bar (updates on tap/click/focus) -->
+  <div class="info-bar" id="infoBar">
+    <span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>
   </div>
 
   <div id="matrices"></div>
@@ -502,18 +502,24 @@
     let currentSpot = 'beauport';
 
     // Fill UI choices
+    const gustSel = document.getElementById('minGustSelect');
+    const dirGrid = document.getElementById('dirGrid');
     MIN_KN_OPTIONS.forEach(v=>{
       const opt = document.createElement('option');
       opt.value = v; opt.textContent = v + ' kn';
       gustSel.appendChild(opt);
     });
-    SECTORS.forEach(sec=>{
+    const SECTORS_LIST = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    SECTORS_LIST.forEach(sec=>{
       const div = document.createElement('div');
       div.className = 'chip';
       div.textContent = sec;
       div.dataset.sec = sec;
       dirGrid.appendChild(div);
     });
+
+    const tideRise = document.getElementById('tideRise');
+    const tideFall = document.getElementById('tideFall');
 
     function refreshSettingsPanel(){
       const s = settings[currentSpot];
@@ -544,7 +550,7 @@
       p.addEventListener('click', ()=>{
         const which = p.dataset.preset;
         const s = settings[currentSpot];
-        if(which==='any'){ s.dirs = new Set(SECTORS); }
+        if(which==='any'){ s.dirs = new Set(SECTORS_LIST); }
         else if(which==='sw'){ s.dirs = new Set(['SSW','SW','WSW']); }
         else if(which==='ne'){ s.dirs = new Set(['NNE','NE','ENE']); }
         else if(which==='none'){ s.dirs = new Set(); }
@@ -576,7 +582,14 @@
     });
 
     // ---------- Tabs ----------
-    spots.forEach((s,i)=>{
+    const tabBar = document.getElementById('tabs');
+    const spotsList = [
+      {key:'beauport',     label:'Baie de Beauport'},
+      {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
+      {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
+      {key:'ange_gardien', label:'Ange-Gardien'},
+    ];
+    spotsList.forEach((s,i)=>{
       const tab = document.createElement('button');
       tab.className = 'tab' + (i===0?' active':'');
       tab.textContent = s.label;
@@ -709,11 +722,21 @@
       matrices.innerHTML = '';
       const views = {};
 
-      spots.forEach((s,i)=>{
+      const tabsEl = document.getElementById('tabs');
+      const matricesEl = document.getElementById('matrices');
+
+      const spotsViews = [
+        {key:'beauport',     label:'Baie de Beauport'},
+        {key:'ste_anne',     label:'Ste-Anne-de-Beaupré'},
+        {key:'st_jean',      label:'St-Jean, Île d’Orléans'},
+        {key:'ange_gardien', label:'Ange-Gardien'},
+      ];
+
+      spotsViews.forEach((s,i)=>{
         const v = buildMatrix(s.key, mode);
         v.style.display = i===0 ? 'block':'none';
         v.id = 'view-'+s.key;
-        matrices.appendChild(v);
+        matricesEl.appendChild(v);
         views[s.key] = v;
 
         // cell interactions
@@ -727,10 +750,10 @@
       });
 
       // Tab switching
-      tabBar.onclick = (e)=>{
+      tabsEl.onclick = (e)=>{
         const btn = e.target.closest('.tab');
         if(!btn) return;
-        [...tabBar.children].forEach(b=>b.classList.remove('active'));
+        [...tabsEl.children].forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
         const target = btn.dataset.target;
         Object.values(views).forEach(v=>v.style.display='none');
@@ -868,6 +891,56 @@
     }
     btnDay.onclick = ()=>{ VIEW='daylight'; setToggle(VIEW); render(VIEW); };
     btnAll.onclick = ()=>{ VIEW='all'; setToggle(VIEW); render(VIEW); };
+
+    // ---------- Tabs build (after map so it stays above filters) ----------
+    const tabsContainer = document.getElementById('tabs');
+    ['beauport','ste_anne','st_jean','ange_gardien'].forEach((key,i)=>{
+      const label = spotByKey[key].label;
+      const tab = document.createElement('button');
+      tab.className = 'tab' + (i===0?' active':'');
+      tab.textContent = label;
+      tab.dataset.target = key;
+      tabsContainer.appendChild(tab);
+    });
+
+    // ---------- Render all spot views ----------
+    function render(mode){
+      matrices.innerHTML = '';
+      const views = {};
+
+      ['beauport','ste_anne','st_jean','ange_gardien'].forEach((k,i)=>{
+        const v = buildMatrix(k, mode);
+        v.style.display = i===0 ? 'block':'none';
+        v.id = 'view-'+k;
+        matrices.appendChild(v);
+        views[k] = v;
+
+        // cell interactions
+        v.addEventListener('click', onCellActivate);
+        v.addEventListener('keydown', (ev)=>{
+          if(ev.key==='Enter' || ev.key===' '){
+            const el = ev.target.closest('.cell');
+            if(el){ ev.preventDefault(); onCellActivate(ev); }
+          }
+        });
+      });
+
+      // Tab switching
+      tabBar.onclick = (e)=>{
+        const btn = e.target.closest('.tab');
+        if(!btn) return;
+        [...tabBar.children].forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.dataset.target;
+        Object.values(views).forEach(v=>v.style.display='none');
+        views[target].style.display = 'block';
+        currentSpot = target;
+        refreshSettingsPanel();
+        infoBar.innerHTML = '<span class="info-dim"><span class="lang-fr">Touchez une cellule</span> / <span class="lang-en">Tap a cell</span></span>';
+        centerMapOnSpot(target);
+        drawSpotSectorsOnMap(target);
+      };
+    }
 
     // ---------- First paint ----------
     refreshSettingsPanel();

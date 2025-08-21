@@ -1537,7 +1537,7 @@
         "wind_kn": 4.7,
         "wind_avg_kn": 4.7,
         "dir_deg": 7,
-        "tide": "slack",
+        "tide": "falling",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -1549,7 +1549,7 @@
         "wind_kn": 2.3,
         "wind_avg_kn": 0.6,
         "dir_deg": 108,
-        "tide": "slack",
+        "tide": "falling",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -1561,7 +1561,7 @@
         "wind_kn": 5.1,
         "wind_avg_kn": 3.6,
         "dir_deg": 119,
-        "tide": "slack",
+        "tide": "falling",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -1573,7 +1573,7 @@
         "wind_kn": 2.1,
         "wind_avg_kn": 1.1,
         "dir_deg": 45,
-        "tide": "slack",
+        "tide": "falling",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -9804,27 +9804,27 @@
   "debug_counts": {
     "beauport": {
       "unknown": 3,
-      "slack": 13,
+      "slack": 12,
       "rising": 77,
-      "falling": 99
+      "falling": 100
     },
     "ste_anne": {
       "unknown": 3,
-      "slack": 13,
+      "slack": 12,
       "rising": 77,
-      "falling": 99
+      "falling": 100
     },
     "st_jean": {
       "unknown": 3,
-      "slack": 13,
+      "slack": 12,
       "rising": 77,
-      "falling": 99
+      "falling": 100
     },
     "ange_gardien": {
       "unknown": 3,
-      "slack": 13,
+      "slack": 12,
       "rising": 77,
-      "falling": 99
+      "falling": 100
     }
   },
   "wind_models": "Open-Meteo auto (no models= param)"

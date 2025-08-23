@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-08-23T06:00:00-04:00",
+  "generated_at": "2025-08-23T07:00:00-04:00",
   "hours": [
     {
       "time": "2025-08-23T00:00",
@@ -313,7 +313,7 @@
         "wind_kn": 3.9,
         "wind_avg_kn": 2.4,
         "dir_deg": 194,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -325,7 +325,7 @@
         "wind_kn": 7.6,
         "wind_avg_kn": 4.5,
         "dir_deg": 198,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -337,7 +337,7 @@
         "wind_kn": 12.2,
         "wind_avg_kn": 7.5,
         "dir_deg": 190,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -349,7 +349,7 @@
         "wind_kn": 4.7,
         "wind_avg_kn": 3.6,
         "dir_deg": 209,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -9803,24 +9803,24 @@
   },
   "debug_counts": {
     "beauport": {
-      "slack": 7,
-      "rising": 82,
-      "falling": 103
+      "slack": 8,
+      "falling": 103,
+      "rising": 81
     },
     "ste_anne": {
-      "slack": 7,
-      "rising": 82,
-      "falling": 103
+      "slack": 8,
+      "falling": 103,
+      "rising": 81
     },
     "st_jean": {
-      "slack": 7,
-      "rising": 82,
-      "falling": 103
+      "slack": 8,
+      "falling": 103,
+      "rising": 81
     },
     "ange_gardien": {
-      "slack": 7,
-      "rising": 82,
-      "falling": 103
+      "slack": 8,
+      "falling": 103,
+      "rising": 81
     }
   },
   "wind_models": "Open-Meteo auto (no models= param)"

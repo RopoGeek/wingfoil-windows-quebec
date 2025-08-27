@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-08-27T06:00:00-04:00",
+  "generated_at": "2025-08-27T07:00:00-04:00",
   "hours": [
     {
       "time": "2025-08-27T00:00",
@@ -313,7 +313,7 @@
         "wind_kn": 6.2,
         "wind_avg_kn": 5.1,
         "dir_deg": 268,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": false,
           "ste_anne": null,
@@ -325,7 +325,7 @@
         "wind_kn": 8.0,
         "wind_avg_kn": 4.0,
         "dir_deg": 203,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": false,
@@ -337,7 +337,7 @@
         "wind_kn": 11.5,
         "wind_avg_kn": 7.4,
         "dir_deg": 200,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -349,7 +349,7 @@
         "wind_kn": 5.8,
         "wind_avg_kn": 4.0,
         "dir_deg": 219,
-        "tide": "rising",
+        "tide": "slack",
         "go": {
           "beauport": null,
           "ste_anne": null,
@@ -9803,23 +9803,23 @@
   },
   "debug_counts": {
     "beauport": {
-      "slack": 7,
-      "rising": 85,
+      "slack": 8,
+      "rising": 84,
       "falling": 100
     },
     "ste_anne": {
-      "slack": 7,
-      "rising": 85,
+      "slack": 8,
+      "rising": 84,
       "falling": 100
     },
     "st_jean": {
-      "slack": 7,
-      "rising": 85,
+      "slack": 8,
+      "rising": 84,
       "falling": 100
     },
     "ange_gardien": {
-      "slack": 7,
-      "rising": 85,
+      "slack": 8,
+      "rising": 84,
       "falling": 100
     }
   },

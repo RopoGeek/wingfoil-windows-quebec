@@ -1,0 +1,13 @@
+{
+  "spots": [
+    { "id": "beauport",     "name": "Baie de Beauport",       "ui": {"lat": 46.83938157700642, "lon": -71.18913476445113}, "fetch": {"lat": 46.84, "lon": -71.19} },
+    { "id": "st_jean",      "name": "St-Jean, Île d’Orléans", "ui": {"lat": 46.915308,          "lon": -70.89627},          "fetch": {"lat": 46.92, "lon": -70.90} },
+    { "id": "ange_gardien", "name": "Ange-Gardien",            "ui": {"lat": 46.907944,          "lon": -71.090028},         "fetch": {"lat": 46.91, "lon": -71.09} },
+    { "id": "ste_anne",     "name": "Ste-Anne-de-Beaupré",    "ui": {"lat": 47.0153,            "lon": -70.928},            "fetch": {"lat": 47.02, "lon": -70.93} },
+    { "id": "spot_3",       "name": "Spot 3",                  "ui": {"lat": 46.8609,            "lon": -71.1835},           "fetch": {"lat": 46.86, "lon": -71.18} },
+    { "id": "spot_4",       "name": "Spot 4",                  "ui": {"lat": 46.842,             "lon": -71.21},             "fetch": {"lat": 46.84, "lon": -71.21} },
+    { "id": "spot_5",       "name": "Spot 5",                  "ui": {"lat": 46.875,             "lon": -71.16},             "fetch": {"lat": 46.88, "lon": -71.16} },
+    { "id": "spot_6",       "name": "Spot 6",                  "ui": {"lat": 46.835,             "lon": -71.245},            "fetch": {"lat": 46.84, "lon": -71.25} }
+  ]
+}
+Add spots.json config.

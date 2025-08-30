@@ -10,4 +10,3 @@
     { "id": "spot_6",       "name": "Spot 6",                  "ui": {"lat": 46.835,             "lon": -71.245},            "fetch": {"lat": 46.84, "lon": -71.25} }
   ]
 }
-Add spots.json config.

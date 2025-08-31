@@ -85,3 +85,12 @@ a{ color:#0a5; text-decoration:underline; }
 #mapWrap{ border:1px solid var(--grid-border); border-radius:10px; background:#fff; padding:8px; }
 #map{ height: 250px; width: 100%; border-radius:8px; }
 .leaflet-container a{ color:#0a5; }
+#forecastTbl td.tide-cell { position: relative; padding-left: 10px; }
+#forecastTbl td.tide-cell .tide-bar {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px; display: block;
+}
+#forecastTbl td.tide-cell .tide-bar.tide-low { background: #8ecae6; }
+#forecastTbl td.tide-cell .tide-bar.tide-mid { background: #ffb703; }
+#forecastTbl td.tide-cell .tide-bar.tide-high { background: #fb8500; }
+#forecastTbl td.tide-cell .tide-bar.tide-very-high { background: #d00000; }
+#forecastTbl td.tide-cell .tide-bar.tide-unknown { background: #e5e7eb; }

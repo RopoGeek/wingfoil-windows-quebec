@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-20T22:00:00-04:00",
+  "generated_at": "2025-09-20T23:00:00-04:00",
   "hours": [
     {
       "time": "2025-09-20T00:00",
@@ -1993,9 +1993,9 @@
     {
       "time": "2025-09-21T15:00",
       "beauport": {
-        "wind_kn": 10.5,
-        "wind_avg_kn": 7.0,
-        "dir_deg": 222,
+        "wind_kn": 11.9,
+        "wind_avg_kn": 7.3,
+        "dir_deg": 224,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -2005,9 +2005,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 11.7,
-        "wind_avg_kn": 7.8,
-        "dir_deg": 212,
+        "wind_kn": 12.1,
+        "wind_avg_kn": 8.1,
+        "dir_deg": 215,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -2029,9 +2029,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 10.7,
-        "wind_avg_kn": 6.6,
-        "dir_deg": 218,
+        "wind_kn": 12.1,
+        "wind_avg_kn": 7.2,
+        "dir_deg": 223,
         "tide": "unknown",
         "go": {
           "beauport": null,

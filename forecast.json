@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-21T03:00:00-05:00",
+  "generated_at": "2026-01-21T04:00:00-05:00",
   "hours": [
     {
       "time": "2026-01-21T00:00",
@@ -157,21 +157,21 @@
     {
       "time": "2026-01-21T03:00",
       "beauport": {
-        "wind_kn": 8.2,
-        "wind_avg_kn": 6.6,
-        "dir_deg": 236,
+        "wind_kn": 10.5,
+        "wind_avg_kn": 5.6,
+        "dir_deg": 245,
         "tide": "unknown",
         "go": {
-          "beauport": false,
+          "beauport": true,
           "ste_anne": null,
           "st_jean": null,
           "ange_gardien": null
         }
       },
       "ste_anne": {
-        "wind_kn": 11.7,
-        "wind_avg_kn": 8.2,
-        "dir_deg": 211,
+        "wind_kn": 9.9,
+        "wind_avg_kn": 6.9,
+        "dir_deg": 198,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -181,9 +181,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 11.3,
-        "wind_avg_kn": 8.9,
-        "dir_deg": 212,
+        "wind_kn": 13.8,
+        "wind_avg_kn": 9.0,
+        "dir_deg": 217,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -193,9 +193,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 11.3,
-        "wind_avg_kn": 7.1,
-        "dir_deg": 202,
+        "wind_kn": 10.1,
+        "wind_avg_kn": 6.4,
+        "dir_deg": 185,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -209,8 +209,8 @@
       "time": "2026-01-21T04:00",
       "beauport": {
         "wind_kn": 8.4,
-        "wind_avg_kn": 7.0,
-        "dir_deg": 257,
+        "wind_avg_kn": 6.7,
+        "dir_deg": 258,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -220,9 +220,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 12.6,
-        "wind_avg_kn": 8.6,
-        "dir_deg": 203,
+        "wind_kn": 12.1,
+        "wind_avg_kn": 9.1,
+        "dir_deg": 204,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -232,9 +232,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 14.4,
-        "wind_avg_kn": 9.3,
-        "dir_deg": 216,
+        "wind_kn": 14.2,
+        "wind_avg_kn": 8.7,
+        "dir_deg": 217,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -244,9 +244,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 10.5,
-        "wind_avg_kn": 5.6,
-        "dir_deg": 205,
+        "wind_kn": 10.9,
+        "wind_avg_kn": 6.1,
+        "dir_deg": 211,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -259,8 +259,8 @@
     {
       "time": "2026-01-21T05:00",
       "beauport": {
-        "wind_kn": 9.9,
-        "wind_avg_kn": 8.2,
+        "wind_kn": 9.3,
+        "wind_avg_kn": 7.8,
         "dir_deg": 248,
         "tide": "unknown",
         "go": {
@@ -271,9 +271,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 13.6,
+        "wind_kn": 13.4,
         "wind_avg_kn": 9.3,
-        "dir_deg": 196,
+        "dir_deg": 200,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -283,9 +283,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 13.4,
-        "wind_avg_kn": 10.4,
-        "dir_deg": 220,
+        "wind_kn": 12.6,
+        "wind_avg_kn": 10.2,
+        "dir_deg": 215,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -295,9 +295,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 11.9,
-        "wind_avg_kn": 6.2,
-        "dir_deg": 208,
+        "wind_kn": 8.6,
+        "wind_avg_kn": 6.3,
+        "dir_deg": 210,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -310,8 +310,8 @@
     {
       "time": "2026-01-21T06:00",
       "beauport": {
-        "wind_kn": 11.1,
-        "wind_avg_kn": 9.1,
+        "wind_kn": 10.7,
+        "wind_avg_kn": 8.9,
         "dir_deg": 255,
         "tide": "unknown",
         "go": {
@@ -322,9 +322,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 15.0,
-        "wind_avg_kn": 10.1,
-        "dir_deg": 200,
+        "wind_kn": 13.6,
+        "wind_avg_kn": 9.9,
+        "dir_deg": 196,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -334,9 +334,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 20.0,
-        "wind_avg_kn": 12.4,
-        "dir_deg": 226,
+        "wind_kn": 15.6,
+        "wind_avg_kn": 11.6,
+        "dir_deg": 228,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -346,9 +346,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 12.6,
-        "wind_avg_kn": 6.1,
-        "dir_deg": 220,
+        "wind_kn": 12.2,
+        "wind_avg_kn": 5.9,
+        "dir_deg": 214,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -361,59 +361,8 @@
     {
       "time": "2026-01-21T07:00",
       "beauport": {
-        "wind_kn": 10.9,
-        "wind_avg_kn": 8.9,
-        "dir_deg": 259,
-        "tide": "unknown",
-        "go": {
-          "beauport": true,
-          "ste_anne": null,
-          "st_jean": null,
-          "ange_gardien": null
-        }
-      },
-      "ste_anne": {
-        "wind_kn": 15.4,
-        "wind_avg_kn": 10.9,
-        "dir_deg": 200,
-        "tide": "unknown",
-        "go": {
-          "beauport": null,
-          "ste_anne": false,
-          "st_jean": null,
-          "ange_gardien": null
-        }
-      },
-      "st_jean": {
-        "wind_kn": 19.0,
-        "wind_avg_kn": 12.4,
-        "dir_deg": 226,
-        "tide": "unknown",
-        "go": {
-          "beauport": null,
-          "ste_anne": null,
-          "st_jean": false,
-          "ange_gardien": null
-        }
-      },
-      "ange_gardien": {
-        "wind_kn": 13.4,
-        "wind_avg_kn": 6.3,
-        "dir_deg": 223,
-        "tide": "unknown",
-        "go": {
-          "beauport": null,
-          "ste_anne": null,
-          "st_jean": null,
-          "ange_gardien": false
-        }
-      }
-    },
-    {
-      "time": "2026-01-21T08:00",
-      "beauport": {
-        "wind_kn": 13.2,
-        "wind_avg_kn": 8.5,
+        "wind_kn": 10.5,
+        "wind_avg_kn": 8.7,
         "dir_deg": 258,
         "tide": "unknown",
         "go": {
@@ -424,9 +373,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 15.9,
-        "wind_avg_kn": 11.1,
-        "dir_deg": 202,
+        "wind_kn": 14.6,
+        "wind_avg_kn": 10.8,
+        "dir_deg": 197,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -436,9 +385,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 18.5,
-        "wind_avg_kn": 12.1,
-        "dir_deg": 225,
+        "wind_kn": 18.7,
+        "wind_avg_kn": 12.0,
+        "dir_deg": 226,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -448,7 +397,7 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 13.0,
+        "wind_kn": 12.8,
         "wind_avg_kn": 6.2,
         "dir_deg": 221,
         "tide": "unknown",
@@ -461,11 +410,62 @@
       }
     },
     {
+      "time": "2026-01-21T08:00",
+      "beauport": {
+        "wind_kn": 9.9,
+        "wind_avg_kn": 8.2,
+        "dir_deg": 258,
+        "tide": "unknown",
+        "go": {
+          "beauport": false,
+          "ste_anne": null,
+          "st_jean": null,
+          "ange_gardien": null
+        }
+      },
+      "ste_anne": {
+        "wind_kn": 15.6,
+        "wind_avg_kn": 11.2,
+        "dir_deg": 198,
+        "tide": "unknown",
+        "go": {
+          "beauport": null,
+          "ste_anne": false,
+          "st_jean": null,
+          "ange_gardien": null
+        }
+      },
+      "st_jean": {
+        "wind_kn": 18.1,
+        "wind_avg_kn": 12.0,
+        "dir_deg": 223,
+        "tide": "unknown",
+        "go": {
+          "beauport": null,
+          "ste_anne": null,
+          "st_jean": false,
+          "ange_gardien": null
+        }
+      },
+      "ange_gardien": {
+        "wind_kn": 12.6,
+        "wind_avg_kn": 6.3,
+        "dir_deg": 223,
+        "tide": "unknown",
+        "go": {
+          "beauport": null,
+          "ste_anne": null,
+          "st_jean": null,
+          "ange_gardien": false
+        }
+      }
+    },
+    {
       "time": "2026-01-21T09:00",
       "beauport": {
-        "wind_kn": 13.0,
-        "wind_avg_kn": 8.5,
-        "dir_deg": 261,
+        "wind_kn": 12.6,
+        "wind_avg_kn": 8.2,
+        "dir_deg": 258,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -476,8 +476,8 @@
       },
       "ste_anne": {
         "wind_kn": 20.2,
-        "wind_avg_kn": 11.6,
-        "dir_deg": 211,
+        "wind_avg_kn": 10.8,
+        "dir_deg": 213,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -487,9 +487,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 20.8,
-        "wind_avg_kn": 11.6,
-        "dir_deg": 230,
+        "wind_kn": 20.4,
+        "wind_avg_kn": 11.3,
+        "dir_deg": 231,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -500,8 +500,8 @@
       },
       "ange_gardien": {
         "wind_kn": 15.9,
-        "wind_avg_kn": 4.6,
-        "dir_deg": 216,
+        "wind_avg_kn": 4.9,
+        "dir_deg": 217,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -514,8 +514,8 @@
     {
       "time": "2026-01-21T10:00",
       "beauport": {
-        "wind_kn": 18.9,
-        "wind_avg_kn": 8.9,
+        "wind_kn": 18.1,
+        "wind_avg_kn": 8.4,
         "dir_deg": 247,
         "tide": "unknown",
         "go": {
@@ -527,8 +527,8 @@
       },
       "ste_anne": {
         "wind_kn": 25.1,
-        "wind_avg_kn": 13.5,
-        "dir_deg": 212,
+        "wind_avg_kn": 12.8,
+        "dir_deg": 216,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -538,8 +538,8 @@
         }
       },
       "st_jean": {
-        "wind_kn": 22.7,
-        "wind_avg_kn": 13.6,
+        "wind_kn": 22.4,
+        "wind_avg_kn": 12.9,
         "dir_deg": 227,
         "tide": "unknown",
         "go": {
@@ -551,7 +551,7 @@
       },
       "ange_gardien": {
         "wind_kn": 18.5,
-        "wind_avg_kn": 7.2,
+        "wind_avg_kn": 6.7,
         "dir_deg": 229,
         "tide": "unknown",
         "go": {
@@ -565,9 +565,9 @@
     {
       "time": "2026-01-21T11:00",
       "beauport": {
-        "wind_kn": 22.0,
+        "wind_kn": 22.5,
         "wind_avg_kn": 10.1,
-        "dir_deg": 242,
+        "dir_deg": 240,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -577,9 +577,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 22.4,
-        "wind_avg_kn": 13.2,
-        "dir_deg": 216,
+        "wind_kn": 24.9,
+        "wind_avg_kn": 13.1,
+        "dir_deg": 220,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -589,8 +589,8 @@
         }
       },
       "st_jean": {
-        "wind_kn": 25.9,
-        "wind_avg_kn": 12.8,
+        "wind_kn": 27.0,
+        "wind_avg_kn": 15.1,
         "dir_deg": 231,
         "tide": "unknown",
         "go": {
@@ -601,9 +601,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 22.0,
-        "wind_avg_kn": 8.9,
-        "dir_deg": 232,
+        "wind_kn": 22.9,
+        "wind_avg_kn": 9.3,
+        "dir_deg": 231,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -616,9 +616,9 @@
     {
       "time": "2026-01-21T12:00",
       "beauport": {
-        "wind_kn": 22.2,
-        "wind_avg_kn": 12.0,
-        "dir_deg": 236,
+        "wind_kn": 22.5,
+        "wind_avg_kn": 12.4,
+        "dir_deg": 235,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -628,9 +628,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 22.4,
-        "wind_avg_kn": 13.2,
-        "dir_deg": 216,
+        "wind_kn": 22.2,
+        "wind_avg_kn": 13.4,
+        "dir_deg": 219,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -640,9 +640,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 24.5,
-        "wind_avg_kn": 14.3,
-        "dir_deg": 225,
+        "wind_kn": 25.1,
+        "wind_avg_kn": 15.8,
+        "dir_deg": 227,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -652,9 +652,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 21.8,
-        "wind_avg_kn": 10.5,
-        "dir_deg": 230,
+        "wind_kn": 22.0,
+        "wind_avg_kn": 11.2,
+        "dir_deg": 229,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -667,9 +667,9 @@
     {
       "time": "2026-01-21T13:00",
       "beauport": {
-        "wind_kn": 20.8,
-        "wind_avg_kn": 11.3,
-        "dir_deg": 235,
+        "wind_kn": 21.0,
+        "wind_avg_kn": 11.4,
+        "dir_deg": 232,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -679,9 +679,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 22.0,
-        "wind_avg_kn": 12.4,
-        "dir_deg": 222,
+        "wind_kn": 20.4,
+        "wind_avg_kn": 12.1,
+        "dir_deg": 220,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -691,9 +691,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 22.7,
-        "wind_avg_kn": 13.8,
-        "dir_deg": 231,
+        "wind_kn": 22.2,
+        "wind_avg_kn": 13.1,
+        "dir_deg": 230,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -703,8 +703,8 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 20.4,
-        "wind_avg_kn": 10.8,
+        "wind_kn": 20.8,
+        "wind_avg_kn": 10.6,
         "dir_deg": 229,
         "tide": "unknown",
         "go": {
@@ -718,9 +718,9 @@
     {
       "time": "2026-01-21T14:00",
       "beauport": {
-        "wind_kn": 20.4,
-        "wind_avg_kn": 11.2,
-        "dir_deg": 235,
+        "wind_kn": 19.6,
+        "wind_avg_kn": 11.1,
+        "dir_deg": 232,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -730,7 +730,7 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 20.0,
+        "wind_kn": 20.4,
         "wind_avg_kn": 12.0,
         "dir_deg": 219,
         "tide": "unknown",
@@ -742,9 +742,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 21.8,
-        "wind_avg_kn": 13.4,
-        "dir_deg": 229,
+        "wind_kn": 20.4,
+        "wind_avg_kn": 12.8,
+        "dir_deg": 228,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -754,8 +754,8 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 19.8,
-        "wind_avg_kn": 10.3,
+        "wind_kn": 19.4,
+        "wind_avg_kn": 10.6,
         "dir_deg": 227,
         "tide": "unknown",
         "go": {
@@ -769,9 +769,9 @@
     {
       "time": "2026-01-21T15:00",
       "beauport": {
-        "wind_kn": 18.1,
-        "wind_avg_kn": 9.4,
-        "dir_deg": 238,
+        "wind_kn": 17.5,
+        "wind_avg_kn": 9.1,
+        "dir_deg": 235,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -781,9 +781,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 20.2,
-        "wind_avg_kn": 11.3,
-        "dir_deg": 222,
+        "wind_kn": 19.2,
+        "wind_avg_kn": 10.7,
+        "dir_deg": 224,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -793,9 +793,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 19.2,
-        "wind_avg_kn": 11.4,
-        "dir_deg": 233,
+        "wind_kn": 18.9,
+        "wind_avg_kn": 11.2,
+        "dir_deg": 231,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -805,9 +805,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 17.9,
-        "wind_avg_kn": 8.9,
-        "dir_deg": 232,
+        "wind_kn": 17.7,
+        "wind_avg_kn": 8.3,
+        "dir_deg": 231,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -820,9 +820,9 @@
     {
       "time": "2026-01-21T16:00",
       "beauport": {
-        "wind_kn": 15.2,
-        "wind_avg_kn": 6.1,
-        "dir_deg": 239,
+        "wind_kn": 14.6,
+        "wind_avg_kn": 6.4,
+        "dir_deg": 232,
         "tide": "unknown",
         "go": {
           "beauport": true,
@@ -832,9 +832,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 18.9,
-        "wind_avg_kn": 9.3,
-        "dir_deg": 231,
+        "wind_kn": 18.3,
+        "wind_avg_kn": 8.8,
+        "dir_deg": 230,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -844,9 +844,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 17.1,
-        "wind_avg_kn": 8.2,
-        "dir_deg": 236,
+        "wind_kn": 16.3,
+        "wind_avg_kn": 8.5,
+        "dir_deg": 227,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -856,9 +856,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 14.8,
-        "wind_avg_kn": 5.7,
-        "dir_deg": 232,
+        "wind_kn": 14.6,
+        "wind_avg_kn": 5.9,
+        "dir_deg": 229,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -871,9 +871,9 @@
     {
       "time": "2026-01-21T17:00",
       "beauport": {
-        "wind_kn": 6.6,
-        "wind_avg_kn": 3.1,
-        "dir_deg": 270,
+        "wind_kn": 6.0,
+        "wind_avg_kn": 2.7,
+        "dir_deg": 262,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -883,9 +883,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 12.6,
-        "wind_avg_kn": 5.5,
-        "dir_deg": 228,
+        "wind_kn": 12.4,
+        "wind_avg_kn": 5.1,
+        "dir_deg": 230,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -895,9 +895,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 10.7,
-        "wind_avg_kn": 5.3,
-        "dir_deg": 237,
+        "wind_kn": 12.4,
+        "wind_avg_kn": 6.5,
+        "dir_deg": 224,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -907,9 +907,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 8.6,
-        "wind_avg_kn": 2.9,
-        "dir_deg": 242,
+        "wind_kn": 8.4,
+        "wind_avg_kn": 2.7,
+        "dir_deg": 240,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -922,9 +922,9 @@
     {
       "time": "2026-01-21T18:00",
       "beauport": {
-        "wind_kn": 2.3,
-        "wind_avg_kn": 0.6,
-        "dir_deg": 90,
+        "wind_kn": 3.1,
+        "wind_avg_kn": 1.8,
+        "dir_deg": 122,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -934,9 +934,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 6.2,
-        "wind_avg_kn": 2.5,
-        "dir_deg": 219,
+        "wind_kn": 5.6,
+        "wind_avg_kn": 2.3,
+        "dir_deg": 222,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -947,8 +947,8 @@
       },
       "st_jean": {
         "wind_kn": 6.0,
-        "wind_avg_kn": 4.5,
-        "dir_deg": 180,
+        "wind_avg_kn": 4.7,
+        "dir_deg": 171,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -958,9 +958,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 1.0,
-        "wind_avg_kn": 0.3,
-        "dir_deg": 45,
+        "wind_kn": 3.3,
+        "wind_avg_kn": 0.7,
+        "dir_deg": 124,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -974,8 +974,8 @@
       "time": "2026-01-21T19:00",
       "beauport": {
         "wind_kn": 4.1,
-        "wind_avg_kn": 3.3,
-        "dir_deg": 130,
+        "wind_avg_kn": 3.5,
+        "dir_deg": 93,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -985,9 +985,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 1.7,
-        "wind_avg_kn": 1.0,
-        "dir_deg": 217,
+        "wind_kn": 1.4,
+        "wind_avg_kn": 1.1,
+        "dir_deg": 121,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -997,9 +997,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 6.0,
-        "wind_avg_kn": 2.8,
-        "dir_deg": 196,
+        "wind_kn": 2.9,
+        "wind_avg_kn": 0.7,
+        "dir_deg": 146,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1011,7 +1011,7 @@
       "ange_gardien": {
         "wind_kn": 2.5,
         "wind_avg_kn": 2.5,
-        "dir_deg": 18,
+        "dir_deg": 45,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1024,9 +1024,9 @@
     {
       "time": "2026-01-21T20:00",
       "beauport": {
-        "wind_kn": 4.5,
-        "wind_avg_kn": 4.4,
-        "dir_deg": 45,
+        "wind_kn": 5.4,
+        "wind_avg_kn": 4.8,
+        "dir_deg": 32,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -1036,8 +1036,8 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 3.1,
-        "wind_avg_kn": 3.2,
+        "wind_kn": 4.1,
+        "wind_avg_kn": 4.2,
         "dir_deg": 11,
         "tide": "unknown",
         "go": {
@@ -1048,9 +1048,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 1.9,
-        "wind_avg_kn": 1.9,
-        "dir_deg": 336,
+        "wind_kn": 3.1,
+        "wind_avg_kn": 3.1,
+        "dir_deg": 356,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1060,9 +1060,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 4.9,
-        "wind_avg_kn": 4.2,
-        "dir_deg": 16,
+        "wind_kn": 4.3,
+        "wind_avg_kn": 4.0,
+        "dir_deg": 11,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1075,9 +1075,9 @@
     {
       "time": "2026-01-21T21:00",
       "beauport": {
-        "wind_kn": 6.0,
-        "wind_avg_kn": 5.5,
-        "dir_deg": 42,
+        "wind_kn": 6.6,
+        "wind_avg_kn": 5.8,
+        "dir_deg": 48,
         "tide": "unknown",
         "go": {
           "beauport": false,
@@ -1087,9 +1087,9 @@
         }
       },
       "ste_anne": {
-        "wind_kn": 3.9,
-        "wind_avg_kn": 3.8,
-        "dir_deg": 339,
+        "wind_kn": 5.2,
+        "wind_avg_kn": 4.3,
+        "dir_deg": 8,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1099,9 +1099,9 @@
         }
       },
       "st_jean": {
-        "wind_kn": 5.2,
-        "wind_avg_kn": 5.1,
-        "dir_deg": 4,
+        "wind_kn": 6.0,
+        "wind_avg_kn": 5.9,
+        "dir_deg": 354,
         "tide": "unknown",
         "go": {
           "beauport": null,
@@ -1111,9 +1111,9 @@
         }
       },
       "ange_gardien": {
-        "wind_kn": 4.9,
-        "wind_avg_kn": 4.5,
-        "dir_deg": 18,
+        "wind_kn": 4.3,
+        "wind_avg_kn": 3.7,
+        "dir_deg": 28,
         "tide": "unknown",
         "go": {
           "beauport": null,
